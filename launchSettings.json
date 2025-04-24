@@ -1,0 +1,17 @@
+{
+  "profiles": {
+    "Docker Compose": {
+      "commandName": "DockerCompose",
+      "commandVersion": "1.0",
+      "composeLaunchAction": "LaunchBrowser",
+      "composeLaunchServiceName": "theta_xspoc_apex_api",
+      "composeLaunchUrl": "{Scheme}://localhost:{ServicePort}/swagger",
+      "serviceActions": {
+        "theta_xspoc_apex_api": "StartDebugging",
+        "theta_xspoc_apex_api_wellcontrol": "StartDebugging",
+        "theta_xspoc_apex_api_setpoint": "StartDebugging",
+        "theta_xspoc_apex_api_users": "StartDebugging"
+      }
+    }
+  }
+}

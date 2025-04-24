@@ -1,0 +1,58 @@
+version: '3.4'
+
+services:
+  theta_xspoc_apex_api:
+    image: thetaxspocapexapi
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: '512m'
+    build:
+      context: .
+      dockerfile: Theta.XSPOC.Apex.Api/Dockerfile
+  theta_xspoc_apex_api_wellcontrol:
+    image: thetaxspocapexapiwellcontrol
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: '512m'
+    build:
+      context: .
+      dockerfile: Theta.XSPOC.Apex.Api.WellControl/Dockerfile
+  theta_xspoc_apex_api_setpoint:
+    image: thetaxspocapexapisetpoint
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: '512m'
+    build:
+      context: .
+      dockerfile: Theta.XSPOC.Apex.Api.Setpoint/Dockerfile
+  theta_xspoc_apex_api_users:
+    image: thetaxspocapexapiusers
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: '512m'
+    build:
+      context: .
+      dockerfile: Theta.XSPOC.Apex.Api.Users/Dockerfile
+  theta_xspoc_apex_api_realtimedata:
+    image: thetaxspocapexapirealtimedata
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: '512m'
+    build:
+      context: .
+      dockerfile: Theta.XSPOC.Apex.Api.RealTimeData/Dockerfile

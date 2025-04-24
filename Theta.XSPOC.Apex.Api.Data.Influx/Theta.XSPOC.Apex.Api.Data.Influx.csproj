@@ -1,0 +1,32 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
+    <UserSecretsId>c011fce1-7dfa-4113-bb22-84065dc58959</UserSecretsId>
+  </PropertyGroup>
+  
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
+  </PropertyGroup>
+  
+  <ItemGroup>
+    <PackageReference Include="InfluxData.Net" Version="8.0.1" />
+    <PackageReference Include="InfluxDB.Client" Version="4.18.0" />
+    <PackageReference Include="InfluxDB.Client.Linq" Version="4.14.0" />
+    <PackageReference Include="InfluxDB.LineProtocol" Version="1.1.1" />
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <ProjectReference Include="..\Theta.XSPOC.Apex.Api.Common\Theta.XSPOC.Apex.Api.Common.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,51 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+	<PropertyGroup>
+		<TargetFramework>net6.0</TargetFramework>
+		<Nullable>disable</Nullable>
+		<ImplicitUsings>disable</ImplicitUsings>
+		<DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+		<DockerComposeProjectPath>..\docker-compose.dcproj</DockerComposeProjectPath>
+		<EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+		<GenerateDocumentationFile>True</GenerateDocumentationFile>
+		<UserSecretsId>37a1bc55-58fd-47ba-8072-feac51b991f4</UserSecretsId>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+		<TreatWarningsAsErrors>True</TreatWarningsAsErrors>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+		<TreatWarningsAsErrors>True</TreatWarningsAsErrors>
+	</PropertyGroup>
+
+	<ItemGroup>
+	  <None Include="..\.dockerignore" Link=".dockerignore">
+	    <DependentUpon>$(DockerDefaultDockerfile)</DependentUpon>
+	  </None>
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.ApplicationInsights.AspNetCore" Version="2.21.0" />
+		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="6.0.10" />
+		<PackageReference Include="Microsoft.AspNetCore.Mvc.Versioning" Version="5.1.0" />
+		<PackageReference Include="Microsoft.AspNetCore.Mvc.Versioning.ApiExplorer" Version="5.1.0" />
+		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
+		<PackageReference Include="Swashbuckle.AspNetCore.Newtonsoft" Version="6.5.0" />
+		<PackageReference Include="System.Text.Json" Version="8.0.5" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <PackageReference Include="Theta.XSPOC.Apex.Kernel" Version="1.0.19" />
+	  <PackageReference Include="Theta.XSPOC.Apex.Kernel.Data.Sql" Version="1.0.9" />
+	  <PackageReference Include="Theta.XSPOC.Apex.Kernel.KeyVault" Version="1.0.1" />
+	  <PackageReference Include="Theta.XSPOC.Apex.Kernel.Licensing" Version="1.0.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\Theta.XSPOC.Apex.Api.Common\Theta.XSPOC.Apex.Api.Common.csproj" />
+	  <ProjectReference Include="..\Theta.XSPOC.Apex.Api.Core\Theta.XSPOC.Apex.Api.Core.csproj" />
+	  <ProjectReference Include="..\Theta.XSPOC.Apex.Api.Data.Mongo\Theta.XSPOC.Apex.Api.Data.Mongo.csproj" />
+	  <ProjectReference Include="..\Theta.XSPOC.Apex.Api.Data.Sql\Theta.XSPOC.Apex.Api.Data.Sql.csproj" />
+	</ItemGroup>
+
+</Project>

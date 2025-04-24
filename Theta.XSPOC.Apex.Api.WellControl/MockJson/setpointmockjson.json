@@ -1,0 +1,403 @@
+{
+  "SetpointGroups": [
+    {
+      "SetpointGroup": 0,
+      "SetpointGroupName": "Setpoints",
+      "RegisterCount": 10,
+      "Setpoints": [
+        {
+          "Parameter": 42195,
+          "Description": "Control Mode",
+          "BackupDate": "01-15-2024 03:34",
+          "BackupValue": "1",
+          "IsSupported": true,
+          "BackUpLookUpValues": [
+            {
+              "text": "Surface",
+              "value": 0
+            },
+            {
+              "text": "Downhole",
+              "value": 1
+            },
+            {
+              "text": "Motor",
+              "value": 2
+            },
+            {
+              "text": "VFD - Surface",
+              "value": 3
+            },
+            {
+              "text": "VFD - Downhole",
+              "value": 4
+            }
+          ]
+        },
+        {
+          "Parameter": 42205,
+          "Description": "Downtime Mode",
+          "BackupDate": "01-15-2024 03:34",
+          "BackupValue": "1",
+          "IsSupported": true,
+          "BackUpLookUpValues": [
+            {
+              "text": "Auto",
+              "value": 0
+            },
+            {
+              "text": "Manual",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "Parameter": 42206,
+          "Description": "Downtime Period Hours",
+          "BackupDate": "01-15-2024 03:34",
+          "BackupValue": 10,
+          "IsSupported": true,
+          "BackUpLookUpValues": null
+        },
+        {
+          "Parameter": 42207,
+          "Description": "Downtime Period Minutes",
+          "BackupDate": "01-15-2024 03:34",
+          "BackupValue": 10,
+          "IsSupported": false,
+          "BackUpLookUpValues": null
+        },
+        {
+          "Parameter": 42263,
+          "Description": "Fill Base Pct of Load",
+          "BackupDate": "01-15-2024 03:34",
+          "BackupValue": 3,
+          "IsSupported": true,
+          "BackUpLookUpValues": null
+        },
+        {
+          "Parameter": 42204,
+          "Description": "Minimum Pump Strokes",
+          "BackupDate": "01-15-2024 03:34",
+          "BackupValue": 1,
+          "IsSupported": true,
+          "BackUpLookUpValues": null
+        },
+        {
+          "Parameter": 42196,
+          "Description": "Operation Mode",
+          "BackupDate": "01-15-2024 03:34",
+          "BackupValue": "0",
+          "IsSupported": false,
+          "BackUpLookUpValues": [
+            {
+              "text": "Normal",
+              "value": 0
+            },
+            {
+              "text": "TimedOut",
+              "value": 1
+            },
+            {
+              "text": "Host",
+              "value": 2
+            }
+          ]
+        },
+        {
+          "Parameter": 42202,
+          "Description": "Power On Delay",
+          "BackupDate": "01-15-2024 03:34",
+          "BackupValue": 4,
+          "IsSupported": true,
+          "BackUpLookUpValues": null
+        },
+        {
+          "Parameter": 42264,
+          "Description": "Reference Pump Fillage",
+          "BackupDate": "01-15-2024 03:34",
+          "BackupValue": 5,
+          "IsSupported": true,
+          "BackUpLookUpValues": null
+        },
+        {
+          "Parameter": 42203,
+          "Description": "Start Alert",
+          "BackupDate": "01-15-2024 03:34",
+          "BackupValue": 7,
+          "IsSupported": true,
+          "BackUpLookUpValues": null
+        }
+      ]
+    },
+    {
+      "SetpointGroup": 1,
+      "SetpointGroupName": "POC Control",
+      "RegisterCount": 1,
+      "Setpoints": [
+        {
+          "Parameter": 42189,
+          "Description": "SWT K Factor",
+          "BackupDate": "01-15-2024 03:34",
+          "BackupValue": 1,
+          "IsSupported": true,
+          "BackUpLookUpValues": null
+        }
+      ]
+    },
+    {
+      "SetpointGroup": 1014,
+      "SetpointGroupName": "Digital Input Configuration",
+      "RegisterCount": 10,
+      "Setpoints": [
+        {
+          "Parameter": 40792,
+          "Description": "DI1 CONFIG 2",
+          "BackupDate": "01-15-2024 03:34",
+          "BackupValue": "Downhole",
+          "IsSupported": true,
+          "BackUpLookUpValues": []
+        },
+        {
+          "Parameter": 40793,
+          "Description": "DI1 CONFIG 3",
+          "BackupDate": "01-15-2024 03:34",
+          "BackupValue": "Manual",
+          "IsSupported": true,
+          "BackUpLookUpValues": null
+        },
+        {
+          "Parameter": 40794,
+          "Description": "DI1 CONFIG 4",
+          "BackupDate": "01-15-2024 03:34",
+          "BackupValue": 10,
+          "IsSupported": true,
+          "BackUpLookUpValues": null
+        },
+        {
+          "Parameter": 40795,
+          "Description": "DI1 CONFIG 5",
+          "BackupDate": "01-15-2024 03:34",
+          "BackupValue": 10,
+          "IsSupported": false,
+          "BackUpLookUpValues": null
+        },
+        {
+          "Parameter": 40796,
+          "Description": "DI1 CONFIG 6",
+          "BackupDate": "01-15-2024 03:34",
+          "BackupValue": 3,
+          "IsSupported": true,
+          "BackUpLookUpValues": null
+        },
+        {
+          "Parameter": 40797,
+          "Description": "DI1 CONFIG 7",
+          "BackupDate": "01-15-2024 03:34",
+          "BackupValue": 1,
+          "IsSupported": true,
+          "BackUpLookUpValues": null
+        },
+        {
+          "Parameter": 40798,
+          "Description": "DI1 CONFIG 8",
+          "BackupDate": "01-15-2024 03:34",
+          "BackupValue": "Normal",
+          "IsSupported": false,
+          "BackUpLookUpValues": null
+        },
+        {
+          "Parameter": 40799,
+          "Description": "DI1 CONFIG 9",
+          "BackupDate": "01-15-2024 03:34",
+          "BackupValue": 4,
+          "IsSupported": true,
+          "BackUpLookUpValues": null
+        },
+        {
+          "Parameter": 40780,
+          "Description": "DI1 CONFIG 11",
+          "BackupDate": "01-15-2024 03:34",
+          "BackupValue": 5,
+          "IsSupported": true,
+          "BackUpLookUpValues": null
+        },
+        {
+          "Parameter": 40781,
+          "Description": "DI1 CONFIG 12",
+          "BackupDate": "01-15-2024 03:34",
+          "BackupValue": 7,
+          "IsSupported": true,
+          "BackUpLookUpValues": null
+        }
+      ]
+    },
+    {
+      "SetpointGroup": 4,
+      "SetpointGroupName": "Inferred Prod",
+      "RegisterCount": 1,
+      "Setpoints": [
+        {
+          "Parameter": 42189,
+          "Description": "SWT Factor",
+          "BackupDate": "01-15-2024 03:34",
+          "BackupValue": 1,
+          "IsSupported": true,
+          "BackUpLookUpValues": null
+        }
+      ]
+    },
+    {
+      "SetpointGroup": 5,
+      "SetpointGroupName": "Pump",
+      "RegisterCount": 2,
+      "Setpoints": [
+        {
+          "Parameter": 42161,
+          "Description": "Load Max Calibration Scaled",
+          "BackupDate": "01-15-2024 03:34",
+          "BackupValue": 1,
+          "IsSupported": true,
+          "BackUpLookUpValues": null
+        },
+        {
+          "Parameter": 42162,
+          "Description": "Load Min Calibration Scaled",
+          "BackupDate": "01-15-2024 03:34",
+          "BackupValue": 1,
+          "IsSupported": true,
+          "BackUpLookUpValues": null
+        }
+      ]
+    },
+    {
+      "SetpointGroup": 30,
+      "SetpointGroupName": "VFD",
+      "RegisterCount": 10,
+      "Setpoints": [
+        {
+          "Parameter": 42552,
+          "Description": "HOA On Speed",
+          "BackupDate": "01-15-2024 03:34",
+          "BackupValue": 1,
+          "IsSupported": true,
+          "BackUpLookUpValues": null
+        },
+        {
+          "Parameter": 42608,
+          "Description": "RFM Min Working Speed Override",
+          "BackupDate": "01-15-2024 03:34",
+          "BackupValue": 1,
+          "IsSupported": true,
+          "BackUpLookUpValues": null
+        },
+        {
+          "Parameter": 42605,
+          "Description": "VFD Drive Fault Downtime Hours",
+          "BackupDate": "01-15-2024 03:34",
+          "BackupValue": 1,
+          "IsSupported": true,
+          "BackUpLookUpValues": null
+        },
+        {
+          "Parameter": 42606,
+          "Description": "VFD Drive Fault Downtime Minutes",
+          "BackupDate": "01-15-2024 03:34",
+          "BackupValue": 1,
+          "IsSupported": true,
+          "BackUpLookUpValues": null
+        },
+        {
+          "Parameter": 42604,
+          "Description": "VFD Drive Fault Downtime Period Source",
+          "BackupDate": "01-15-2024 03:34",
+          "BackupValue": 1,
+          "IsSupported": true,
+          "BackUpLookUpValues": null
+        },
+        {
+          "Parameter": 42595,
+          "Description": "VFD Special trip Action",
+          "BackupDate": "01-15-2024 03:34",
+          "BackupValue": 1,
+          "IsSupported": true,
+          "BackUpLookUpValues": null
+        },
+        {
+          "Parameter": 42594,
+          "Description": "VFD Speed Control Option",
+          "BackupDate": "01-15-2024 03:34",
+          "BackupValue": 1,
+          "IsSupported": true,
+          "BackUpLookUpValues": null
+        },
+        {
+          "Parameter": 42593,
+          "Description": "VFD Speed Source",
+          "BackupDate": "01-15-2024 03:34",
+          "BackupValue": 1,
+          "IsSupported": true,
+          "BackUpLookUpValues": null
+        }
+      ]
+    },
+    {
+      "SetpointGroup": 6,
+      "SetpointGroupName": "Violations",
+      "RegisterCount": 10,
+      "Setpoints": [
+        {
+          "Parameter": 42217,
+          "Description": "Violation Config (host)",
+          "BackupDate": "01-15-2024 03:34",
+          "BackupValue": 1,
+          "IsSupported": true,
+          "BackUpLookUpValues": null
+        },
+        {
+          "Parameter": 42221,
+          "Description": "Violation Config (normal)",
+          "BackupDate": "01-15-2024 03:34",
+          "BackupValue": 1,
+          "IsSupported": true,
+          "BackUpLookUpValues": null
+        },
+        {
+          "Parameter": 42219,
+          "Description": "Violation Config (timed)",
+          "BackupDate": "01-15-2024 03:34",
+          "BackupValue": 1,
+          "IsSupported": true,
+          "BackUpLookUpValues": null
+        }
+      ]
+    },
+    {
+      "SetpointGroup": 7,
+      "SetpointGroupName": "Malfunctions",
+      "RegisterCount": 10,
+      "Setpoints": []
+    },
+    {
+      "SetpointGroup": 8,
+      "SetpointGroupName": "Comm",
+      "RegisterCount": 10,
+      "Setpoints": []
+    },
+    {
+      "SetpointGroup": 10,
+      "SetpointGroupName": "SAM Malf",
+      "RegisterCount": 10,
+      "Setpoints": [
+        {
+          "Parameter": 42176,
+          "Description": "Position Threshold Raw",
+          "BackupDate": "01-15-2024 03:34",
+          "BackupValue": 1,
+          "IsSupported": true,
+          "BackUpLookUpValues": null
+        }
+      ]
+    }
+  ]
+}

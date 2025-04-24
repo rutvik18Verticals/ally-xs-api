@@ -1,0 +1,69 @@
+﻿version: '3.4'
+
+services:
+  theta_xspoc_apex_webapi:
+    image: {{imagename}}
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - "node.role==manager"
+      resources:
+        limits:
+          cpus: '0.4'
+    environment:
+      - "RabbitMQ:Endpoint={{RabbitMQEndpoint}}"
+      - "RabbitMQ:User={{rabbitmq-username}}"
+      - "RabbitMQ:Password={{rabbitmq-password}}"
+      - "RabbitMQ:VirtualHost={{VirtualHost}}"
+      - "ConnectionStrings:XspocDBConnection={{XspocDBConnection}}"
+      - "ConnectionStrings:NoLockXspocDBConnection={{NoLockXspocDBConnection}}"
+      - "AdvancedLogging:ElasticUrl={{ElasticUrl}}"
+      - "LogSettings:GroupStatusLogVerbosity=error"
+      - "LogSettings:NotificationLogVerbosity=error"
+      - "LogSettings:RodLiftAnalysisLogVerbosity=error"
+      - "LogSettings:ESPAnalysisLogVerbosity=error"
+      - "LogSettings:WellTestLogVerbosity=error"
+      - "LogSettings:GLAnalysisLogVerbosity=error"
+      - "LogSettings:GroupAndAssetLogVerbosity=error"
+      - "LogSettings:TrendDataLogVerbosity=error"
+      - "LogSettings:LoginLogVerbosity=error"
+      - "LogSettings:APIServiceLogVerbosity=error"
+      - "LogSettings:SQLStoreLogVerbosity=error"
+      - "TimeZoneBehavior:UseApplicationTimeZone={{UseApplicationTimeZone}}"
+      - "TimeZoneBehavior:ApplicationTimeZone={{ApplicationTimeZone}}"
+      - "ASPNETCORE_ENVIRONMENT={{ASPNETCORE_ENVIRONMENT}}"
+      - "ASPNETCORE_URLS={{ASPNETCORE_URLS}}"
+      - "XSPOCDatabase:ConnectionString={{MongoDBConnectionString}}"
+      - "XSPOCDatabase:DatabaseName={{DatabaseName-ReactApi}}"
+      - "CorsPolicy:Enabled=true"
+      - "CorsPolicy:Origins={{CorsPolicyOrigins}}"
+      - "AppSettings:InfluxEndPoint={{InfluxEndPoint}}"
+      - "AppSettings:DeploymentMode=OSS"
+      - "AppSettings:InfluxToken={{InfluxToken-reactapi}}"
+      - "AppSettings:BucketRetentionInSecs={{BucketRetentionInSecs}}"
+      - "AppSettings:InfluxUser={{InfluxUser}}"
+      - "AppSettings:InfluxPassword={{InfluxPassword}}"
+      - "AppSettings:BucketName={{BucketName}}"
+      - "AppSettings:Org={{Organization}}"
+      - "AppSettings:AllyConnectApiURL={{AllyConnectApiURL}}"
+      - "AppSettings:UseSecureCookies={{UseSecureCookies}}"
+      - "AppSettings:MeasurementName={{MeasurementName}}"
+      - "AppSettings:ApplicationDeploymentMode={{ApplicationDeploymentMode}}"
+      - "AppSettings:EnablePumpChecker={{PumpChecker_Enabled_Or_Not}}"
+      - "AppSettings:AllyOnboardingUIURL={{AllyOnboardingUIURL}}"
+      - "AppSettings:PumpCheckerURL={{PumpCheckerBaseURL}}"
+      - "AppSettings:LoginURL={{LoginURL}}"
+      - "AppSettings:HostingEnvironment={{HostingEnvironment}}"
+      - "AppSettings:LoginMode={{LoginMode}}"
+    ports:
+      - mode: host
+        published: 3010
+        target: 3010
+    networks:
+      - nat
+
+networks:
+  nat:
+    external: true

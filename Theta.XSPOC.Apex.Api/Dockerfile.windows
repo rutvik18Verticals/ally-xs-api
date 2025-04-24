@@ -1,0 +1,26 @@
+FROM mcr.microsoft.com/dotnet/aspnet:6.0 AS base
+USER ContainerUser
+WORKDIR C:\\app
+EXPOSE 80
+EXPOSE 443
+
+FROM mcr.microsoft.com/dotnet/sdk:6.0 AS build
+USER ContainerUser
+WORKDIR C:\\src
+COPY . .
+RUN dotnet restore Theta.XSPOC.Apex.Api\\Theta.XSPOC.Apex.Api.csproj
+RUN dotnet build Theta.XSPOC.Apex.Api\\Theta.XSPOC.Apex.Api.csproj -c Release -o C:\\app\\build
+
+FROM build AS publish
+USER ContainerUser
+RUN dotnet publish Theta.XSPOC.Apex.Api\\Theta.XSPOC.Apex.Api.csproj -c Release -o C:\\app\\publish
+
+FROM mcr.microsoft.com/dotnet/aspnet:6.0
+USER ContainerUser
+WORKDIR C:\\app
+
+FROM base AS final
+USER ContainerUser
+WORKDIR C:\\app
+COPY --from=publish C:\\app\\publish .
+ENTRYPOINT ["dotnet", "Theta.XSPOC.Apex.Api.dll"]

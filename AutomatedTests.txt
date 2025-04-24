@@ -1,0 +1,10 @@
+Theta.XSPOC.Apex.Api.Core.Tests
+Theta.XSPOC.Apex.Api.Data.Sql.Tests
+Theta.XSPOC.Apex.Api.Data.Tests
+Theta.XSPOC.Apex.Api.Tests
+Theta.XSPOC.Apex.Api.Setpoint.Test
+Theta.XSPOC.Apex.Api.WellControl.Test
+Theta.XSPOC.Apex.Api.Common.Tests
+Theta.XSPOC.Apex.Api.Data.Mongo.Tests
+Theta.XSPOC.Apex.Api.Data.Influx.Tests
+Theta.XSPOC.Apex.Api.Users.Tests

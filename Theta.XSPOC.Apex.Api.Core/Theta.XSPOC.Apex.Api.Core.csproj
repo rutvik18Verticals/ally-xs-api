@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
+  </PropertyGroup>
+  
+  <ItemGroup>
+    <PackageReference Include="MathNet.Numerics" Version="5.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Identity.Stores" Version="8.0.3" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="System.Runtime.Caching" Version="7.0.0" />
+  </ItemGroup>
+  
+  <ItemGroup>
+      <PackageReference Include="Theta.XSPOC.Apex.Kernel.UnitConversion" Version="1.0.2" />
+    <PackageReference Include="Theta.XSPOC.Apex.Kernel.Quantity" Version="1.0.3" />
+    <PackageReference Include="Theta.XSPOC.Apex.Kernel.Logging" Version="1.0.10" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="Models\MethodResults.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Theta.XSPOC.Apex.Api.Common\Theta.XSPOC.Apex.Api.Common.csproj" />
+    <ProjectReference Include="..\Theta.XSPOC.Apex.Api.Data.Influx\Theta.XSPOC.Apex.Api.Data.Influx.csproj" />
+    <ProjectReference Include="..\Theta.XSPOC.Apex.Api.Data\Theta.XSPOC.Apex.Api.Data.csproj" />
+  </ItemGroup>
+</Project>

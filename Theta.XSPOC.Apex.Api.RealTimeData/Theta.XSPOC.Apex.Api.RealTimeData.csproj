@@ -1,0 +1,31 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <UserSecretsId>13e67617-f684-428d-857a-ffd7c5b77964</UserSecretsId>
+    <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+    <DockerComposeProjectPath>..\docker-compose.dcproj</DockerComposeProjectPath>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
+    <ServerGarbageCollection>false</ServerGarbageCollection>    
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.19.6" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Theta.XSPOC.Apex.Api.Common\Theta.XSPOC.Apex.Api.Common.csproj" />
+    <ProjectReference Include="..\Theta.XSPOC.Apex.Api.Core\Theta.XSPOC.Apex.Api.Core.csproj" />
+    <ProjectReference Include="..\Theta.XSPOC.Apex.Api.Data.Entity\Theta.XSPOC.Apex.Api.Data.Entity.csproj" />
+    <ProjectReference Include="..\Theta.XSPOC.Apex.Api.Data.Mongo\Theta.XSPOC.Apex.Api.Data.Mongo.csproj" />
+    <ProjectReference Include="..\Theta.XSPOC.Apex.Api.Data.Sql\Theta.XSPOC.Apex.Api.Data.Sql.csproj" />
+    <PackageReference Include="Theta.XSPOC.Apex.Kernel.KeyVault" Version="1.0.1" />
+    <PackageReference Include="Theta.XSPOC.Apex.Kernel.Logging" Version="1.0.10" />
+    <PackageReference Include="Swashbuckle.AspNetCore.Newtonsoft" Version="6.5.0" />
+  </ItemGroup>
+
+</Project>

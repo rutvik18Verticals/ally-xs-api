@@ -1,0 +1,64 @@
+version: '3.4'
+
+services:
+  theta_xspoc_apex_api:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=https://+:443;http://+:80
+      - ASPNETCORE_Kestrel__Certificates__Default__Path=/home/xspoc/.aspnet/https/Theta.XSPOC.Apex.Api.Docker.pfx
+      - ASPNETCORE_Kestrel__Certificates__Default__Password=${KESTREL_PASSWORD}
+    ports:
+      - "80"
+      - "443"
+    volumes:
+      - ${APPDATA}/Microsoft/UserSecrets:/home/xspoc/.microsoft/usersecrets:ro
+      - ${APPDATA}/ASP.NET/Https:/home/xspoc/.aspnet/https:ro
+  theta_xspoc_apex_api_wellcontrol:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=https://+:443;http://+:80
+      - ASPNETCORE_Kestrel__Certificates__Default__Path=/home/xspoc/.aspnet/https/Theta.XSPOC.Apex.Api.Docker.pfx
+      - ASPNETCORE_Kestrel__Certificates__Default__Password=${KESTREL_PASSWORD}
+    ports:
+      - "80"
+      - "443"
+      - "5000:5000"
+    volumes:
+      - ${APPDATA}/Microsoft/UserSecrets:/home/xspoc/.microsoft/usersecrets:ro
+      - ${APPDATA}/ASP.NET/Https:/home/xspoc/.aspnet/https:ro
+  theta_xspoc_apex_api_setpoint:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=https://+:443;http://+:80
+      - ASPNETCORE_Kestrel__Certificates__Default__Path=/home/xspoc/.aspnet/https/Theta.XSPOC.Apex.Api.Docker.pfx
+      - ASPNETCORE_Kestrel__Certificates__Default__Password=${KESTREL_PASSWORD}
+    ports:
+      - "80"
+      - "443"
+    volumes:
+      - ${APPDATA}/Microsoft/UserSecrets:/home/xspoc/.microsoft/usersecrets:ro
+      - ${APPDATA}/ASP.NET/Https:/home/xspoc/.aspnet/https:ro
+  theta_xspoc_apex_api_users:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=https://+:443;http://+:80
+      - ASPNETCORE_Kestrel__Certificates__Default__Path=/home/xspoc/.aspnet/https/Theta.XSPOC.Apex.Api.Docker.pfx
+      - ASPNETCORE_Kestrel__Certificates__Default__Password=${KESTREL_PASSWORD}
+    ports:
+      - "80"
+      - "443"      
+    volumes:
+      - ${APPDATA}/Microsoft/UserSecrets:/home/xspoc/.microsoft/usersecrets:ro
+      - ${APPDATA}/ASP.NET/Https:/home/xspoc/.aspnet/https:ro
+  theta_xspoc_apex_api_realtimedata:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=https://+:443;http://+:80
+      - ASPNETCORE_Kestrel__Certificates__Default__Path=/home/xspoc/.aspnet/https/Theta.XSPOC.Apex.Api.Docker.pfx
+      - ASPNETCORE_Kestrel__Certificates__Default__Password=${KESTREL_PASSWORD}
+    ports:
+      - "80"
+      - "443"      
+    volumes:
+      - ${APPDATA}/Microsoft/UserSecrets:/home/xspoc/.microsoft/usersecrets:ro
+      - ${APPDATA}/ASP.NET/Https:/home/xspoc/.aspnet/https:ro

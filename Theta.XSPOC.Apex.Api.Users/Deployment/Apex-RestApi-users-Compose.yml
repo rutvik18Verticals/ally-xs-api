@@ -1,0 +1,40 @@
+﻿version: '3.4'
+
+services:
+  theta_xspoc_apex_webapiuser:
+    image: {{imagename}}
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - "node.role==manager"
+      resources:
+        limits:
+          cpus: '0.4'
+    environment:
+      - "RabbitMQ:Endpoint={{RabbitMQEndpoint}}"
+      - "RabbitMQ:User=guest"
+      - "RabbitMQ:Password=guest"
+      - "RabbitMQ:VirtualHost={{VirtualHost}}"
+      - "ConnectionStrings:XspocDBConnection={{XspocDBConnection}}"
+      - "ConnectionStrings:NoLockXspocDBConnection={{NoLockXspocDBConnection}}"
+      - "AdvancedLogging:ElasticUrl={{ElasticUrl}}"
+      - "LogSettings:UserDefaultLogVerbosity=error"
+      - "TimeZoneBehavior:UseApplicationTimeZone={{UseApplicationTimeZone}}"
+      - "TimeZoneBehavior:ApplicationTimeZone={{ApplicationTimeZone}}"
+      - "XSPOCDatabase:ConnectionString={{MongoDBConnectionString}}"
+      - "XSPOCDatabase:DatabaseName={{DatabaseName-ReactApi}}"
+      - "ASPNETCORE_ENVIRONMENT={{ASPNETCORE_ENVIRONMENT}}"
+      - "ASPNETCORE_URLS={{ASPNETCORE_URLS-RestApiUsers}}"
+      - "CorsPolicy:Origins={{CorsPolicyOrigins}}"
+    ports:
+      - mode: host
+        published: 5289
+        target: 5289
+    networks:
+      - nat
+
+networks:
+  nat:
+    external: true

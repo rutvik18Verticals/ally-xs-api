@@ -1,0 +1,50 @@
+﻿version: '3.4'
+
+services:
+  theta_xspoc_apex_realtimedata_api:
+    image: {{imagename}}
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - "node.role==manager"
+      resources:
+        limits:
+          cpus: '0.4'
+    environment:
+      - "ASPNETCORE_ENVIRONMENT={{ASPNETCORE_ENVIRONMENT}}"
+      - "XSPOCDatabase:DatabaseName={{DatabaseName-ReactApi}}"
+      - "XSPOCDatabase:ConnectionString={{MongoDBConnectionString}}"
+      - "AllyAPIAuthorization:ApiHeader=ally-api-token"
+      - "AllyAPIAuthorization:ApiUser={{ApiUser}}"
+      - "AllyAPIAuthorization:ApiSecret={{ApiSecret}}"
+      - "CorsPolicy:Enabled=true"
+      - "CorsPolicy:Origins={{CorsPolicyOrigins}}"
+      - "AppSettings:InfluxEndPoint={{InfluxEndPoint}}"
+      - "AppSettings:DeploymentMode={{DeploymentMode}}"
+      - "AppSettings:InfluxToken={{InfluxToken-reactapi}}"
+      - "AppSettings:BucketRetentionInSecs={{BucketRetentionInSecs}}"
+      - "AppSettings:InfluxUser={{InfluxUser}}"
+      - "AppSettings:InfluxPassword={{InfluxPassword}}"
+      - "AppSettings:BucketName={{BucketName}}"
+      - "AppSettings:Org={{Organization}}"
+      - "AppSettings:MeasurementName={{MeasurementName}}"
+      - "AppSettings:PageSize={{PageSize}}"
+      - "AppSettings:MaxNoOfAssetIds={{Max-No-Of-AssetIds}}"
+      - "AppSettings:MaxNoOfTagIds={{Max-No-Of-TagIds}}"
+      - "AppSettings:AssetCnt5To50SampType30mLmtDwnSampWindSize={{Downsampling-Windowsize-Below50Assets}}"
+      - "AppSettings:AssetCntAbove50SampType30mLmtDwnSampWindSize={{Downsampling-Windowsize-Above50Assets}}"
+      - "AppSettings:ApplicationDeploymentMode={{ApplicationDeploymentMode}}"
+      - "TimeZoneBehavior:UseApplicationTimeZone={{UseApplicationTimeZone}}"
+      - "TimeZoneBehavior:ApplicationTimeZone={{ApplicationTimeZone}}"
+    ports:
+      - mode: host
+        published: 3022
+        target: 80
+    networks:
+      - nat
+
+networks:
+  nat:
+    external: true

@@ -1,0 +1,44 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="Mapper\**" />
+    <EmbeddedResource Remove="Mapper\**" />
+    <None Remove="Mapper\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Azure.Identity" Version="1.11.4" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="6.0.10" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="5.1.3" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="7.0.2" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="7.0.2" />
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+    <PackageReference Include="Theta.XSPOC.Apex.Kernel" Version="1.0.19" />
+    <PackageReference Include="Theta.XSPOC.Apex.Kernel.Data.Sql" Version="1.0.9" />
+    <PackageReference Include="Theta.XSPOC.Apex.Kernel.Logging" Version="1.0.10" />
+    <PackageReference Include="Theta.XSPOC.Apex.Kernel.Utilities" Version="1.0.2" />
+    <PackageReference Include="Theta.XSPOC.Apex.Kernel.UnitConversion" Version="1.0.2" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <ProjectReference Include="..\Theta.XSPOC.Apex.Api.Data.Entity\Theta.XSPOC.Apex.Api.Data.Entity.csproj" />
+    <ProjectReference Include="..\Theta.XSPOC.Apex.Api.Data\Theta.XSPOC.Apex.Api.Data.csproj" />
+  </ItemGroup>
+
+</Project>

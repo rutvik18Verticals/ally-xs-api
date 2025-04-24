@@ -1,0 +1,31 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+      <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
+  </PropertyGroup>
+  
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+      <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+      <PackageReference Include="MongoDB.Bson" Version="2.19.1" />
+      <PackageReference Include="MongoDB.Driver" Version="2.19.1" />
+      <PackageReference Include="Theta.XSPOC.Apex.Kernel.DateTimeConversion" Version="1.0.8" />
+  </ItemGroup>
+    
+  <ItemGroup>
+    <ProjectReference Include="..\Theta.XSPOC.Apex.Api.Core\Theta.XSPOC.Apex.Api.Core.csproj" />
+    <ProjectReference Include="..\Theta.XSPOC.Apex.Api.Data.Entity\Theta.XSPOC.Apex.Api.Data.Entity.csproj" />
+    <ProjectReference Include="..\Theta.XSPOC.Apex.Api.Data\Theta.XSPOC.Apex.Api.Data.csproj" />
+  </ItemGroup>
+
+</Project>
