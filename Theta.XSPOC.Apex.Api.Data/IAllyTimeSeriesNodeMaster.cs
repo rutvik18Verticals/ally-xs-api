@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Theta.XSPOC.Apex.Api.Data.Models;
+using Theta.XSPOC.Apex.Api.Data.Models.MongoCollection;
+using Theta.XSPOC.Apex.Api.Data.Models.MongoCollection.Lookup;
 
 namespace Theta.XSPOC.Apex.Api.Data
 {      /// <summary>
@@ -41,5 +43,18 @@ namespace Theta.XSPOC.Apex.Api.Data
         /// <param name="correlationId">The correlation id.</param>
         /// <returns>The <seealso cref="NodeMasterModel"/>.</returns>
         public Task<IList<NodeMasterModel>> ValidateCustomerAsync(string customerId, string tokenKey, string tokenValue, string correlationId);
+        /// <summary>
+        /// Gets all default parameter collection values
+        /// </summary>
+        /// <param name="correlationId"></param>
+        /// <returns>The <seealso cref="DefaultParameters"/>.</returns>
+        public Task<IList<DefaultParameters>> GetAllDefaultParametersAsync(string correlationId);
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="correlationId"></param>
+        /// <returns></returns>
+        public Task<IList<TimeSeriesChartAggregation>> GetTimeSeriesChartAggregationAsync(string correlationId);
     }
 }

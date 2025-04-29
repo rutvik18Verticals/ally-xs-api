@@ -64,5 +64,10 @@ namespace Theta.XSPOC.Apex.Api.Data.Models.Identity
         /// </summary>
         public bool IsFirstTimeLogin { get; set; }
 
+        /// <summary>
+        /// Get or sets the UserObjectId
+        /// </summary>
+        public string UserObjectId { get; set; }
+
     }
 }

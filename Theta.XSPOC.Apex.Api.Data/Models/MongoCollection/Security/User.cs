@@ -8,6 +8,7 @@ namespace Theta.XSPOC.Apex.Api.Data.Models.MongoCollection.Security
     /// <summary>
     /// This class defines the user MongoDB document.
     /// </summary>
+    [BsonIgnoreExtraElements]
     public class User : CustomerDocumentBase
     {
 

@@ -11,7 +11,7 @@ using Theta.XSPOC.Apex.Api.Core.Services;
 using Theta.XSPOC.Apex.Api.Data;
 using Theta.XSPOC.Apex.Api.Data.Entity;
 using Theta.XSPOC.Apex.Api.Data.Models.Identity;
-using Theta.XSPOC.Apex.Api.Data.Sql;
+using Theta.XSPOC.Apex.Api.Data.Mongo;
 
 namespace theta.XSPOC.Apex.Api.Contracts.JWTToken
 {
@@ -47,7 +47,7 @@ namespace theta.XSPOC.Apex.Api.Contracts.JWTToken
             .AddEntityFrameworkStores<XspocDbContext>()
             .AddDefaultTokenProviders();
             _ = services.AddTransient<IAdminToolsService, AdminToolsService>();
-            _ = services.AddTransient<IAuthService, AuthServiceSQLStore>();
+            _ = services.AddTransient<IAuthService, AuthServiceMongoStore>();
 
             return services;
         }

@@ -482,6 +482,7 @@ namespace Theta.XSPOC.Apex.Api.Controllers
                 WellConfig = userDetails.GetSpecificClaim("WellConfig") == "True",
                 WellConfigLite = userDetails.GetSpecificClaim("WellConfigLite") == "True",
                 WellControl = userDetails.GetSpecificClaim("WellControl") == "True",
+                UserObjectId = userDetails.GetSpecificClaim("UserObjectId")
             };
 
             var inputWithCorrelationId = new WithCorrelationId<AppUser>(correlationId, appUser);

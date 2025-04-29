@@ -398,14 +398,18 @@ namespace Theta.XSPOC.Apex.Api.Controllers
 
             var startDate = filters[QueryParams.StartDate];
             var endDate = filters[QueryParams.EndDate];
-            var chart1Type = filters[QueryParams.Chart1Type];
-            var chart1ItemId = filters[QueryParams.Chart1ItemId];
-            var chart2Type = filters[QueryParams.Chart2Type];
-            var chart2ItemId = filters[QueryParams.Chart2ItemId];
-            var chart3Type = filters[QueryParams.Chart3Type];
-            var chart3ItemId = filters[QueryParams.Chart3ItemId];
-            var chart4Type = filters[QueryParams.Chart4Type];
-            var chart4ItemId = filters[QueryParams.Chart4ItemId];
+            var chart1TrendTypes = filters[QueryParams.Chart1TrendTypes];
+            var chart1TrendNames = filters[QueryParams.Chart1TrendNames];
+            var chart1TrendAddresses = filters[QueryParams.Chart1TrendAddresses];
+            var chart2TrendTypes = filters[QueryParams.Chart2TrendTypes];
+            var chart2TrendNames = filters[QueryParams.Chart2TrendNames];
+            var chart2TrendAddresses = filters[QueryParams.Chart2TrendAddresses];
+            var chart3TrendTypes = filters[QueryParams.Chart3TrendTypes];
+            var chart3TrendNames = filters[QueryParams.Chart3TrendNames];
+            var chart3TrendAddresses = filters[QueryParams.Chart3TrendAddresses];
+            var chart4TrendTypes = filters[QueryParams.Chart4TrendTypes];
+            var chart4TrendNames = filters[QueryParams.Chart4TrendNames];
+            var chart4TrendAddresses = filters[QueryParams.Chart4TrendAddresses];
             var groupName = filters[QueryParams.GroupName];
 
             bool isOverlay = false;
@@ -420,14 +424,18 @@ namespace Theta.XSPOC.Apex.Api.Controllers
                 AssetId = parsedAssetId,
                 StartDate = startDate,
                 EndDate = endDate,
-                Chart1ItemId = chart1ItemId ?? string.Empty,
-                Chart1Type = chart1Type ?? string.Empty,
-                Chart2ItemId = chart2ItemId ?? string.Empty,
-                Chart2Type = chart2Type ?? string.Empty,
-                Chart3ItemId = chart3ItemId ?? string.Empty,
-                Chart3Type = chart3Type ?? string.Empty,
-                Chart4ItemId = chart4ItemId ?? string.Empty,
-                Chart4Type = chart4Type ?? string.Empty,
+                Chart1TrendNames = chart1TrendNames ?? string.Empty,
+                Chart1TrendTypes = chart1TrendTypes ?? string.Empty,
+                Chart1TrendAddresses = chart1TrendAddresses ?? string.Empty,
+                Chart2TrendNames = chart2TrendNames ?? string.Empty,
+                Chart2TrendTypes = chart2TrendTypes ?? string.Empty,
+                Chart2TrendAddresses = chart2TrendAddresses ?? string.Empty,
+                Chart3TrendNames = chart3TrendNames ?? string.Empty,
+                Chart3TrendTypes = chart3TrendTypes ?? string.Empty,
+                Chart3TrendAddresses = chart3TrendAddresses ?? string.Empty,
+                Chart4TrendNames = chart4TrendNames ?? string.Empty,
+                Chart4TrendTypes = chart4TrendTypes ?? string.Empty,
+                Chart4TrendAddresses = chart4TrendAddresses ?? string.Empty,
                 IsOverlay = isOverlay,
                 GroupName = groupName,
             };

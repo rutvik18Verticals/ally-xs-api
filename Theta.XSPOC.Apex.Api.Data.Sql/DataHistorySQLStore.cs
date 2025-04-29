@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -25,6 +26,8 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql
 
         private readonly IThetaDbContextFactory<NoLockXspocDbContext> _contextFactory;
         private readonly IMemoryCache _cache;
+        private readonly IDataHistoryMongoStore _dataHistoryMongoStore;
+        private readonly IConfiguration _configuration;
 
         #endregion
 
@@ -39,15 +42,20 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql
         /// </param>
         /// <param name="memoryCache">The memory cache.</param>
         /// <param name="loggerFactory"></param>
+        /// <param name="dataHistoryMongoStore"></param>
+        /// <param name="configuration"></param>
         /// <exception cref="ArgumentNullException">
         /// <paramref name="contextFactory"/> is null.
         /// or
         /// </exception>
-        public DataHistorySQLStore(IThetaDbContextFactory<NoLockXspocDbContext> contextFactory, IMemoryCache memoryCache, IThetaLoggerFactory loggerFactory)
+        public DataHistorySQLStore(IThetaDbContextFactory<NoLockXspocDbContext> contextFactory, IMemoryCache memoryCache, IThetaLoggerFactory loggerFactory,
+            IDataHistoryMongoStore dataHistoryMongoStore,IConfiguration configuration)
             : base(contextFactory, loggerFactory)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _cache = memoryCache ?? throw new ArgumentNullException(nameof(memoryCache));
+            _dataHistoryMongoStore = dataHistoryMongoStore;
+            _configuration = configuration;
         }
 
         #endregion
@@ -148,75 +156,15 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql
         public IList<MeasurementTrendDataModel> GetMeasurementTrendData(string nodeId,
             int paramStandardType, DateTime startDate, DateTime endDate, string correlationId)
         {
-            var logger = LoggerFactory.Create(LoggingModel.SQLStore);
-            logger.WriteCId(Level.Trace, $"Starting {nameof(DataHistorySQLStore)} {nameof(GetMeasurementTrendData)}", correlationId);
-
-            IList<MeasurementTrendDataModel> result;
-            float maxDecimal = 9999999999999999999999999999f;
-            using (var context = _contextFactory.GetContext())
+            bool isInfluxEnabled = _configuration.GetValue("EnableInflux", false);
+            if (isInfluxEnabled)
             {
-                result = (from d in (from p in context.Parameters.AsNoTracking()
-                                     join t in context.FacilityTags.AsNoTracking() on p.Address equals t.Address into pt
-                                     from t in pt.DefaultIfEmpty()
-                                     where (p.Poctype == (from nm in context.NodeMasters.AsNoTracking()
-                                                          where nm.NodeId == nodeId
-                                                          select nm.PocType).FirstOrDefault()
-                                                          || p.Poctype == 99 ||
-                                                          p.Poctype == ((from nm in context.NodeMasters.AsNoTracking()
-                                                                         where nm.NodeId == nodeId
-                                                                         select nm.PocType).FirstOrDefault() == 17 ? 8 : null))
-                                                                         && p.ParamStandardType == @paramStandardType
-                                     select new
-                                     {
-                                         p.Address,
-                                         IsManual = p.Address > 4000 && p.Address <= 5000 ? 1 : 0
-                                     }).Union(from t in context.FacilityTags.AsNoTracking()
-                                              where t.GroupNodeId == nodeId && t.ParamStandardType == @paramStandardType
-                                              select new
-                                              {
-                                                  t.Address,
-                                                  IsManual = 0
-                                              })
-                          join dh in (from dh in context.DataHistory.AsNoTracking()
-                                      where dh.NodeID == nodeId && dh.Date >= @startDate && dh.Date <= @endDate
-                                      select new
-                                      {
-                                          dh.Address,
-                                          dh.Date,
-                                          Value = dh.Value > @maxDecimal ? @maxDecimal : dh.Value
-                                      }).Union(from dha in context.DataHistoryArchive.AsNoTracking()
-                                               where dha.NodeID == nodeId && dha.Date >= @startDate && dha.Date <= @endDate
-                                               select new
-                                               {
-                                                   dha.Address,
-                                                   dha.Date,
-                                                   Value = dha.Value > @maxDecimal ? @maxDecimal : dha.Value
-                                               }) on d.Address equals dh.Address
-                          where (from ft in context.FacilityTags.AsNoTracking()
-                                 where ft.GroupNodeId == nodeId &&
-                                 ft.ParamStandardType == @paramStandardType
-                                 select ft.Address).Count() == 0 ||
-                                 ((from ft in context.FacilityTags.AsNoTracking()
-                                   where ft.GroupNodeId == nodeId
-                                   && ft.ParamStandardType == @paramStandardType
-                                   select ft.Address).Contains(d.Address)
-                                   || (from p in context.Parameters.AsNoTracking()
-                                       where p.Poctype == 99 && p.ParamStandardType == @paramStandardType
-                                       select p.Address).Contains(d.Address))
-                          orderby dh.Date
-                          select new MeasurementTrendDataModel
-                          {
-                              Address = dh.Address,
-                              Date = dh.Date,
-                              Value = dh.Value,
-                              IsManual = d.IsManual == 1
-                          }).Distinct().ToList();
-
+                return _dataHistoryMongoStore.GetMeasurementTrendData(nodeId, paramStandardType, startDate, endDate, correlationId);
             }
-
-            logger.WriteCId(Level.Trace, $"Finished {nameof(DataHistorySQLStore)} {nameof(GetMeasurementTrendData)}", correlationId);
-
-            return result;
+            else
+            {
+                return GetMeasurementTrendDataUsingSQL(nodeId, paramStandardType, startDate, endDate, correlationId);
+            }
         }
 
         /// <summary>
@@ -2097,7 +2045,80 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql
             return returnList;
         }
 
-        #endregion
+        private IList<MeasurementTrendDataModel> GetMeasurementTrendDataUsingSQL(string nodeId,
+            int paramStandardType, DateTime startDate, DateTime endDate, string correlationId)
+        {
+            var logger = LoggerFactory.Create(LoggingModel.SQLStore);
+            logger.WriteCId(Level.Trace, $"Starting {nameof(DataHistorySQLStore)} {nameof(GetMeasurementTrendData)}", correlationId);
 
-    }
+            IList<MeasurementTrendDataModel> result;
+            float maxDecimal = 9999999999999999999999999999f;
+            using (var context = _contextFactory.GetContext())
+            {
+                result = (from d in (from p in context.Parameters.AsNoTracking()
+                                     join t in context.FacilityTags.AsNoTracking() on p.Address equals t.Address into pt
+                                     from t in pt.DefaultIfEmpty()
+                                     where (p.Poctype == (from nm in context.NodeMasters.AsNoTracking()
+                                                          where nm.NodeId == nodeId
+                                                          select nm.PocType).FirstOrDefault()
+                                                          || p.Poctype == 99 ||
+                                                          p.Poctype == ((from nm in context.NodeMasters.AsNoTracking()
+                                                                         where nm.NodeId == nodeId
+                                                                         select nm.PocType).FirstOrDefault() == 17 ? 8 : null))
+                                                                         && p.ParamStandardType == @paramStandardType
+                                     select new
+                                     {
+                                         p.Address,
+                                         IsManual = p.Address > 4000 && p.Address <= 5000 ? 1 : 0
+                                     }).Union(from t in context.FacilityTags.AsNoTracking()
+                                              where t.GroupNodeId == nodeId && t.ParamStandardType == @paramStandardType
+                                              select new
+                                              {
+                                                  t.Address,
+                                                  IsManual = 0
+                                              })
+                          join dh in (from dh in context.DataHistory.AsNoTracking()
+                                      where dh.NodeID == nodeId && dh.Date >= @startDate && dh.Date <= @endDate
+                                      select new
+                                      {
+                                          dh.Address,
+                                          dh.Date,
+                                          Value = dh.Value > @maxDecimal ? @maxDecimal : dh.Value
+                                      }).Union(from dha in context.DataHistoryArchive.AsNoTracking()
+                                               where dha.NodeID == nodeId && dha.Date >= @startDate && dha.Date <= @endDate
+                                               select new
+                                               {
+                                                   dha.Address,
+                                                   dha.Date,
+                                                   Value = dha.Value > @maxDecimal ? @maxDecimal : dha.Value
+                                               }) on d.Address equals dh.Address
+                          where (from ft in context.FacilityTags.AsNoTracking()
+                                 where ft.GroupNodeId == nodeId &&
+                                 ft.ParamStandardType == @paramStandardType
+                                 select ft.Address).Count() == 0 ||
+                                 ((from ft in context.FacilityTags.AsNoTracking()
+                                   where ft.GroupNodeId == nodeId
+                                   && ft.ParamStandardType == @paramStandardType
+                                   select ft.Address).Contains(d.Address)
+                                   || (from p in context.Parameters.AsNoTracking()
+                                       where p.Poctype == 99 && p.ParamStandardType == @paramStandardType
+                                       select p.Address).Contains(d.Address))
+                          orderby dh.Date
+                          select new MeasurementTrendDataModel
+                          {
+                              Address = dh.Address,
+                              Date = dh.Date,
+                              Value = dh.Value,
+                              IsManual = d.IsManual == 1
+                          }).Distinct().ToList();
+
+            }
+
+            logger.WriteCId(Level.Trace, $"Finished {nameof(DataHistorySQLStore)} {nameof(GetMeasurementTrendData)}", correlationId);
+
+            return result;
+        }
+            #endregion
+
+        }
 }

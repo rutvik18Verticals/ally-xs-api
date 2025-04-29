@@ -76,7 +76,7 @@ namespace Theta.XSPOC.Apex.Api.Data.Mongo
         {
             var logger = _loggerFactory.Create(LoggingModel.MongoDataStore);
             logger.WriteCId(Level.Trace, $"Starting {nameof(MongoOperations)}" +
-                $" {nameof(FindAll)}", correlationId);
+                $" {nameof(Find)}", correlationId);
             try
             {
                 var mongoCollection = _mongoDatabase.GetCollection<T>(collectionName, null);
@@ -89,7 +89,7 @@ namespace Theta.XSPOC.Apex.Api.Data.Mongo
             }
             catch (Exception ex)
             {
-                logger.WriteCId(Level.Error, $"Error in  {nameof(MongoOperations)} {nameof(FindAll)}" +
+                logger.WriteCId(Level.Error, $"Error in  {nameof(MongoOperations)} {nameof(Find)}" +
                 $" {ex.Message}", correlationId);
             }
 
@@ -110,7 +110,7 @@ namespace Theta.XSPOC.Apex.Api.Data.Mongo
         {
             var logger = _loggerFactory.Create(LoggingModel.MongoDataStore);
             logger.WriteCId(Level.Trace, $"Starting {nameof(MongoOperations)}" +
-                $" {nameof(FindAll)}", correlationId);
+                $" {nameof(Find)}", correlationId);
             try
             {
                 var mongoCollection = _mongoDatabase.GetCollection<T>(collectionName);
@@ -143,7 +143,7 @@ namespace Theta.XSPOC.Apex.Api.Data.Mongo
         {
             var logger = _loggerFactory.Create(LoggingModel.MongoDataStore);
             logger.WriteCId(Level.Trace, $"Starting {nameof(MongoOperations)}" +
-                $" {nameof(FindAll)}", correlationId);
+                $" {nameof(FindMany)}", correlationId);
             try
             {
                 var mongoCollection = _mongoDatabase.GetCollection<T>(collectionName);

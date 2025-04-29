@@ -85,6 +85,7 @@ namespace Theta.XSPOC.Apex.Api.Data.Mongo
 
                     result = new AppUser
                     {
+                        UserObjectId = user.Id,
                         UserName = user.UserName,
                         PasswordHash = user.Password,
                         WellControl = userRolesData.Any(ur => ur.RoleIds.Contains(roles.First(r => r.RoleName == "Well Control").Id)),

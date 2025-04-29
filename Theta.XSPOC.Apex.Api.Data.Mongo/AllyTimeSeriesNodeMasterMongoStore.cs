@@ -14,6 +14,7 @@ using MongoCustomerAccessDetailsCollection = Theta.XSPOC.Apex.Api.Data.Models.Mo
 using Enums = Theta.XSPOC.Apex.Api.Data.Models.MongoCollection.Enums;
 using Theta.XSPOC.Apex.Api.Data.Models.MongoCollection.Lookup;
 using MongoDB.Bson;
+using Theta.XSPOC.Apex.Api.Data.Models.MongoCollection;
 
 namespace Theta.XSPOC.Apex.Api.Data.Mongo
 {
@@ -32,6 +33,7 @@ namespace Theta.XSPOC.Apex.Api.Data.Mongo
 
         private const string COLLECTION_LOOKUP_NAME = "Lookup";
 
+        private const string COLLECTION_DEFAULT_PARAMETERS_NAME = "DefaultParameters";
         #endregion
 
         #region Private Fields
@@ -253,6 +255,67 @@ namespace Theta.XSPOC.Apex.Api.Data.Mongo
             return new List<NodeMasterModel>();
         }
 
+        /// <summary>
+        /// Get the list of all parameter standard type.
+        /// </summary>
+        /// <returns>The <seealso cref="IList{ParamStandardData}"/>.</returns>
+        public async Task<IList<DefaultParameters>> GetAllDefaultParametersAsync(string correlationId)
+        {
+            var logger = _loggerFactory.Create(LoggingModel.MongoDataStore);
+            logger.WriteCId(Level.Trace, $"Starting {nameof(NodeMastersMongoStore)}" + $" {nameof(GetAllDefaultParametersAsync)}", correlationId);
+
+            await Task.Yield();
+
+            var defaultPara = FindAll<DefaultParameters>(COLLECTION_DEFAULT_PARAMETERS_NAME, correlationId);
+
+            if (defaultPara != null)
+            {
+                 logger.WriteCId(Level.Trace, $"Finished {nameof(NodeMastersMongoStore)} " + $"{nameof(GetAllDefaultParametersAsync)}", correlationId);
+                 return defaultPara;              
+            }
+
+            logger.WriteCId(Level.Trace, $"Finished {nameof(NodeMastersMongoStore)} " + $"{nameof(GetAllDefaultParametersAsync)}", correlationId);
+
+            return null;
+        }
+
+        /// <summary>
+        /// Get the list of all parameter standard type.
+        /// </summary>
+        /// <returns>The <seealso cref="IList{TimeSeriesChartAggregation}"/>.</returns>
+        public async Task<IList<TimeSeriesChartAggregation>> GetTimeSeriesChartAggregationAsync(string correlationId)
+        {
+            var logger = _loggerFactory.Create(LoggingModel.MongoDataStore);
+            logger.WriteCId(Level.Trace, $"Starting {nameof(NodeMastersMongoStore)}" + $" {nameof(GetTimeSeriesChartAggregationAsync)}", correlationId);
+
+            await Task.Yield();
+
+            var filter = new FilterDefinitionBuilder<MongoLookupCollection.Lookup>()
+               .Where(x => (x.LookupType == "TimeSeriesChartAggregation"));
+
+            var lookupData = Find<MongoLookupCollection.Lookup>(COLLECTION_LOOKUP_NAME, filter, correlationId);
+
+            if (lookupData != null)
+            {
+                if (lookupData.Count > 0)
+                {
+                    var result = lookupData.Select(item => new TimeSeriesChartAggregation
+                    {
+                        Name = ((TimeSeriesChartAggregation)item.LookupDocument).Name,
+                        Minutes = ((TimeSeriesChartAggregation)item.LookupDocument).Minutes,
+                        Aggregate = ((TimeSeriesChartAggregation)item.LookupDocument).Aggregate,
+                    });
+
+                    logger.WriteCId(Level.Trace, $"Finished {nameof(NodeMastersMongoStore)} " + $"{nameof(GetTimeSeriesChartAggregationAsync)}", correlationId);
+
+                    return result.ToList();
+                }
+            }
+
+            logger.WriteCId(Level.Trace, $"Finished {nameof(NodeMastersMongoStore)} " + $"{nameof(GetTimeSeriesChartAggregationAsync)}", correlationId);
+
+            return new List<TimeSeriesChartAggregation>();
+        }
         private int? GetArtificialLiftType(string artificialLiftType)
         {
             if (artificialLiftType == null)

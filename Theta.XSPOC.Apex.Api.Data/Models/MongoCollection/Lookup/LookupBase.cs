@@ -17,7 +17,7 @@ namespace Theta.XSPOC.Apex.Api.Data.Models.MongoCollection.Lookup
         typeof(GroupStatusViewsColumns), typeof(IPRCalculationErrorTypes), typeof(MeterTypes), typeof(POCTypeApplication),
         typeof(ProtocolTypes), typeof(SensitivityAnalysisCustomInputType), typeof(SensitivityAnalysisInputTypes), typeof(SensitivityAnalysisInputOptions),
         typeof(SensitivityAnalysisInputs), typeof(SetpointGroups), typeof(StatusRegisters), typeof(XDiagOutputs), typeof(FacilityTagGroups), typeof(CameraTypes),
-        typeof(CameraConfigurations), typeof(CameraAlarmTypes))]
+        typeof(CameraConfigurations), typeof(CameraAlarmTypes),typeof(TimeSeriesChartAggregation))]
     public class LookupBase
     {
 

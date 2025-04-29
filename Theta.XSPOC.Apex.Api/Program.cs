@@ -43,6 +43,8 @@ using System.Net.Http;
 using Theta.XSPOC.Apex.Api.Core.Models.Configuration;
 using Theta.XSPOC.Apex.Api.Core.Models;
 using Theta.XSPOC.Apex.Api.Core.Middleware;
+using Theta.XSPOC.Apex.Api.Core.Services.DashboardService;
+using Theta.XSPOC.Apex.Api.Core.Services.UserAccountService;
 
 namespace Theta.XSPOC.Apex.Api
 {
@@ -348,6 +350,14 @@ namespace Theta.XSPOC.Apex.Api
             services.AddSingleton<IGLAnalysis, GLAnalysisSQLStore>();
             services.AddSingleton<IWellAnalysisCorrelation, WellAnalysisCorrelationSQLStore>();
 
+            services.AddScoped<ILoggedInUserProvider, LoggedInUserProvider>();
+            #region Dashboard
+
+            services.AddSingleton<IDashboardWidgetService, DashboardWidgetService>();
+            services.AddSingleton<IDashboardStore, DashboardMongoStore>();            
+
+            #endregion
+
             if (hostContext.Configuration.GetValue<bool>("MongoDbInjection:Manufacturer"))
             {
                 services.AddSingleton<IManufacturer, GLManufacturerMongoStore>();
@@ -372,7 +382,8 @@ namespace Theta.XSPOC.Apex.Api
             services.AddSingleton<IWellTestsProcessingService, WellTestsProcessingService>();
             services.AddSingleton<IWellTests, WellTestsSQLStore>();
             services.AddSingleton<IDataHistorySQLStore, DataHistorySQLStore>();
-
+            services.AddSingleton<IDataHistoryMongoStore, DataHistoryMongoStore>();
+            
             if (hostContext.Configuration.GetValue<bool>("MongoDbInjection:PocType"))
             {
                 services.AddSingleton<IPocType, PocTypeMongoStore>();

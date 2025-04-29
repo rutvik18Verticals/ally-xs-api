@@ -339,6 +339,16 @@
         /// <summary>
         /// Facility Tag Group lookup type.
         /// </summary>
-        FacilityTagGroups = 69
+        FacilityTagGroups = 69,
+
+        /// <summary>
+        /// Mode of Production Mapping lookup type.
+        /// </summary>
+        MethodOfProductionMapping = 70,
+
+        /// <summary>
+        /// Time Series Chart Aggregation lookup type.
+        /// </summary>
+        TimeSeriesChartAggregation = 71
     }
 }
