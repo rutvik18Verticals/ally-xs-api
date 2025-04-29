@@ -49,9 +49,55 @@ namespace Theta.XSPOC.Apex.Api.Data.Mongo
         /// <param name="endDate">The end date.</param>
         /// <param name="correlationId"></param>
         /// <returns>The <seealso cref="IList{ControllerTrendDataModel}"/>.</returns>
-        public IList<ControllerTrendDataModel> GetControllerTrendData(string nodeId, int address, DateTime startDate, DateTime endDate, string correlationId)
+        public async Task<IList<ControllerTrendDataModel>> GetControllerTrendData(string nodeId, int address, DateTime startDate, DateTime endDate, string correlationId)
         {
-            throw new NotImplementedException();
+            float maxDecimal = 9999999999999999999999999999f;
+            var parametersCollection = _database.GetCollection<Parameters>("Parameters");
+            var assetsCollection = _database.GetCollection<MongoAssetCollection>("Asset");
+
+            // Fetch asset data
+            var assetData = await assetsCollection.Find(x => x.LegacyId["NodeId"] == nodeId).FirstOrDefaultAsync();
+            string poctype = assetData?.POCType.LegacyId["POCTypesId"];
+
+            // Filter for parameters
+            var parameterFilter = Builders<Parameters>.Filter.And(
+                Builders<Parameters>.Filter.Eq(p => p.LegacyId["NodeId"], nodeId),
+                Builders<Parameters>.Filter.Eq(p => p.Address, address),
+                Builders<Parameters>.Filter.Eq(p => p.Enabled, true)
+            );
+
+            var parameters = await parametersCollection.Find(parameterFilter).ToListAsync();
+            var parameterList = parameters.Select(p => new
+            {
+                p.Address,
+                p.ChannelId
+            }).ToList();
+
+            // Get NodeId from Asset
+            Guid assetGUID = Guid.TryParse(assetData?.LegacyId?["AssetGUID"], out var parsedGuid)
+                ? parsedGuid
+                : Guid.Empty;
+
+            if (assetGUID == Guid.Empty)
+            {
+                return Enumerable.Empty<ControllerTrendDataModel>().ToList();
+            }
+
+            // Fetch data history from Influx
+            IList<DataPointModel> dataHistories = await _getDataHistoryItemsService.GetDataHistoryItems(
+                assetGUID, Guid.Empty, poctype, new List<string> { address.ToString() }, null, startDate.ToString(), endDate.ToString());
+
+            // Join parameters with data history
+            var joinedResult = (from p in parameterList
+                                join dh in dataHistories on p.ChannelId equals dh.ChannelId
+                                orderby dh.Time
+                                select new ControllerTrendDataModel
+                                {
+                                    Date = dh.Time,
+                                    Value = ConvertToFloat(dh.Value) is float v ? (v > maxDecimal ? maxDecimal : v) : 0f
+                                }).Distinct().ToList();
+
+            return joinedResult;
         }
 
         /// <summary>

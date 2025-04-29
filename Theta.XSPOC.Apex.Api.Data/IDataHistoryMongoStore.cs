@@ -49,7 +49,7 @@ namespace Theta.XSPOC.Apex.Api.Data
         /// <param name="endDate">The end date.</param>
         /// <param name="correlationId"></param>
         /// <returns>The <seealso cref="IList{ControllerTrendDataModel}"/>.</returns>
-        IList<ControllerTrendDataModel> GetControllerTrendData(string nodeId,
+        Task<IList<ControllerTrendDataModel>> GetControllerTrendData(string nodeId,
             int address, DateTime startDate, DateTime endDate, string correlationId);
 
         /// <summary>

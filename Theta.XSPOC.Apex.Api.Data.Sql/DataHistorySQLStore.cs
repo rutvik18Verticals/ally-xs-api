@@ -5,9 +5,12 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
+using System.Net;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using Theta.XSPOC.Apex.Api.Data.Entity;
+using Theta.XSPOC.Apex.Api.Data.Entity.EntitySetup;
 using Theta.XSPOC.Apex.Api.Data.Models;
 using Theta.XSPOC.Apex.Api.Data.Sql.Logging;
 using Theta.XSPOC.Apex.Kernel.Data.Sql.Entity;
@@ -1691,44 +1694,20 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql
         /// <param name="endDate">The End Date.</param>
         /// <param name="correlationId"></param>
         /// <returns>The <seealso cref="IList{ControllerTrendDataModel}"/>.</returns>
-        public IList<ControllerTrendDataModel> GetControllerTrendData(string nodeId,
+        public async Task<IList<ControllerTrendDataModel>> GetControllerTrendData(string nodeId,
             int address, DateTime startDate, DateTime endDate, string correlationId)
         {
-            var logger = LoggerFactory.Create(LoggingModel.SQLStore);
-            logger.WriteCId(Level.Trace, $"Starting {nameof(DataHistorySQLStore)} {nameof(GetControllerTrendData)}", correlationId);
 
-            List<ControllerTrendDataModel> listControllerTrendDataModel
-                = new List<ControllerTrendDataModel>();
-            float maxDecimal = 9999999999999999999999999999f;
-
-            using (var context = _contextFactory.GetContext())
+            bool isInfluxEnabled = _configuration.GetValue("EnableInflux", false);
+            if (isInfluxEnabled)
             {
-                listControllerTrendDataModel.AddRange(
-                    context.DataHistory.AsNoTracking()
-                        .Where(x => x.NodeID == nodeId &&
-                            x.Address == address &&
-                            x.Date >= @startDate && x.Date <= endDate)
-                        .Select(x => new ControllerTrendDataModel
-                        {
-                            Date = x.Date,
-                            Value = x.Value > maxDecimal ? maxDecimal : x.Value
-                        }).ToList());
-
-                listControllerTrendDataModel.AddRange(
-                    context.DataHistoryArchive.AsNoTracking()
-                        .Where(x => x.NodeID == nodeId &&
-                            x.Address == address &&
-                            x.Date >= @startDate && x.Date <= endDate)
-                        .Select(x => new ControllerTrendDataModel
-                        {
-                            Date = x.Date,
-                            Value = x.Value > maxDecimal ? maxDecimal : x.Value
-                        }).ToList());
+                return await _dataHistoryMongoStore.GetControllerTrendData(nodeId, address, startDate, endDate, correlationId);
+            }
+            else
+            {
+                return GetControllerTrendDataUsingSQL(nodeId, address, startDate, endDate, correlationId);
             }
 
-            logger.WriteCId(Level.Trace, $"Finished {nameof(DataHistorySQLStore)} {nameof(GetControllerTrendData)}", correlationId);
-
-            return listControllerTrendDataModel.OrderBy(x => x.Date).ToList();
         }
 
         /// <summary>
@@ -2118,7 +2097,47 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql
 
             return result;
         }
-            #endregion
 
+        private IList<ControllerTrendDataModel> GetControllerTrendDataUsingSQL(string nodeId,
+            int address, DateTime startDate, DateTime endDate, string correlationId)
+        {
+            var logger = LoggerFactory.Create(LoggingModel.SQLStore);
+            logger.WriteCId(Level.Trace, $"Starting {nameof(DataHistorySQLStore)} {nameof(GetControllerTrendData)}", correlationId);
+
+            List<ControllerTrendDataModel> listControllerTrendDataModel
+                = new List<ControllerTrendDataModel>();
+            float maxDecimal = 9999999999999999999999999999f;
+
+            using (var context = _contextFactory.GetContext())
+            {
+                listControllerTrendDataModel.AddRange(
+                    context.DataHistory.AsNoTracking()
+                        .Where(x => x.NodeID == nodeId &&
+                            x.Address == address &&
+                            x.Date >= @startDate && x.Date <= endDate)
+                        .Select(x => new ControllerTrendDataModel
+                        {
+                            Date = x.Date,
+                            Value = x.Value > maxDecimal ? maxDecimal : x.Value
+                        }).ToList());
+
+                listControllerTrendDataModel.AddRange(
+                    context.DataHistoryArchive.AsNoTracking()
+                        .Where(x => x.NodeID == nodeId &&
+                            x.Address == address &&
+                            x.Date >= @startDate && x.Date <= endDate)
+                        .Select(x => new ControllerTrendDataModel
+                        {
+                            Date = x.Date,
+                            Value = x.Value > maxDecimal ? maxDecimal : x.Value
+                        }).ToList());
+            }
+
+            logger.WriteCId(Level.Trace, $"Finished {nameof(DataHistorySQLStore)} {nameof(GetControllerTrendData)}", correlationId);
+
+            return listControllerTrendDataModel.OrderBy(x => x.Date).ToList();
         }
+        #endregion
+
+    }
 }
