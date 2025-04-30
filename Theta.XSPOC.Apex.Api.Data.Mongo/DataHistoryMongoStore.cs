@@ -112,7 +112,81 @@ namespace Theta.XSPOC.Apex.Api.Data.Mongo
         /// <returns>The <seealso cref="ControllerTrendItemModel"/>.</returns>
         public IList<ControllerTrendItemModel> GetControllerTrendItems(string nodeId, int pocType, string correlationId)
         {
-            throw new NotImplementedException();
+            var parametersCollection = _database.GetCollection<Parameters>("Parameters");
+            var assetsCollection = _database.GetCollection<MongoAssetCollection>("Asset");
+
+            // Fetch asset data
+            var assetData = assetsCollection.Find(x => x.LegacyId["NodeId"] == nodeId).FirstOrDefault();
+            if (assetData == null)
+            {
+                return Enumerable.Empty<ControllerTrendItemModel>().ToList();
+            }
+
+            string poctype = assetData.POCType.LegacyId["POCTypesId"];
+
+            // Filter for facility tags
+            var facilityTagFilter = Builders<Parameters>.Filter.And(
+                Builders<Parameters>.Filter.Eq(p => p.ParameterType, "Facility"),
+                Builders<Parameters>.Filter.Eq(p => p.Enabled, true),
+                Builders<Parameters>.Filter.Eq(p => p.LegacyId["NodeId"], nodeId),
+                Builders<Parameters>.Filter.Ne(p => p.ParamStandardType, null)
+            );
+
+            var facilityTags = parametersCollection.Find(facilityTagFilter).ToList();
+            var facilityTagAddresses = facilityTags.Select(ft => ft.Address).ToList();
+            bool facilityTagsExist = facilityTagAddresses.Any();
+
+            // Filter for parameters
+            var parameterFilter = Builders<Parameters>.Filter.And(
+                Builders<Parameters>.Filter.Eq(p => p.ParamStandardType, null),
+                Builders<Parameters>.Filter.Or(
+                    Builders<Parameters>.Filter.Eq(p => p.LegacyId["POCType"], poctype),
+                    Builders<Parameters>.Filter.Eq(p => p.LegacyId["POCType"], "99")
+                )
+            );
+
+            var parameters = parametersCollection.Find(parameterFilter).ToList();
+
+            // Map parameters to ControllerTrendItemModel
+            var parameterItems = parameters.Select(p => new ControllerTrendItemModel
+            {
+                Name = p.Description,
+                Description = p.Description,
+                Address = p.Address,
+                UnitType = int.TryParse(p.UnitType?.Id, out var unitTypeId) ? unitTypeId : 0, // Safely parse the string to an int
+                FacilityTag = 0,
+                Tag = null
+            }).ToList();
+
+            // Map facility tags to ControllerTrendItemModel
+            var facilityTagItems = facilityTags.Select(ft => new ControllerTrendItemModel
+            {
+                Name = ft.Description,
+                Description = ft.Description ?? string.Empty,
+                Address = ft.Address,
+                UnitType = int.TryParse(ft.UnitType?.Id, out var unitTypeId) ? unitTypeId : 0, // Safely parse the string to an int
+                FacilityTag = 1,
+                Tag = null
+            }).ToList();
+
+            // Combine parameters and facility tags
+            var combinedItems = parameterItems.Concat(facilityTagItems).ToList();
+
+            // Fetch data history from Influx
+            var dataHistoryAddresses = _getDataHistoryItemsService.GetDataHistoryItems(
+                Guid.Parse(assetData.LegacyId["AssetGUID"]),
+                Guid.Empty,
+                poctype,
+                combinedItems.Select(item => item.Address.ToString()).ToList(),
+                null,
+                null,
+                null
+            ).Result.Select(dh => int.Parse(dh.ChannelId)).ToList();
+
+            // Filter combined items by data history addresses
+            var filteredItems = combinedItems.Where(item => dataHistoryAddresses.Contains(item.Address)).ToList();
+
+            return filteredItems;
         }
 
         /// <summary>
