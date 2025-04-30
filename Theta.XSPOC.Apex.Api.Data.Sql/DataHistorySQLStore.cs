@@ -2106,7 +2106,7 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql
             return dataModels;
         }
 
-        private IList<ControllerTrendItemModel> GetControllerTrendItemsUsingSQL(string nodeId, int pocType, string correlationId)
+private IList<ControllerTrendItemModel> GetControllerTrendItemsUsingSQL(string nodeId, int pocType, string correlationId)
         {
             var logger = LoggerFactory.Create(LoggingModel.SQLStore);
             logger.WriteCId(Level.Trace,
