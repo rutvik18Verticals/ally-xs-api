@@ -176,122 +176,17 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql
         /// <param name="nodeId">The node id.</param>
         /// <param name="correlationId"></param>
         /// <returns>The <seealso cref="IList{MeasurementTrendItemModel}"/>.</returns>
-        public IList<MeasurementTrendItemModel> GetMeasurementTrendItems(string nodeId, string correlationId)
+        public async Task<IList<MeasurementTrendItemM GetMeasurementTrendItems(string nodeId, string correlationId)
         {
-            var logger = LoggerFactory.Create(LoggingModel.SQLStore);
-            logger.WriteCId(Level.Trace, $"Starting {nameof(DataHistorySQLStore)} {nameof(GetMeasurementTrendItems)}", correlationId);
-
-            IList<MeasurementTrendItemModel> dataModels =
-                new List<MeasurementTrendItemModel>();
-
-            string cacheKey = string.Empty;
-            using (var context = _contextFactory.GetContext())
+            bool isInfluxEnabled = _configuration.GetValue("EnableInflux", false);
+            if (isInfluxEnabled)
             {
-                var assetGuid = context.NodeMasters.AsNoTracking()
-                     .Where(x => x.NodeId == nodeId)
-                     .Select(x => x.AssetGuid).FirstOrDefault();
-
-                cacheKey = $"MeasurementTrendItems::{assetGuid}";
-            }
-
-            if (_cache.TryGetValue<IList<MeasurementTrendItemModel>>(cacheKey, out var measurementTrend))
-            {
-                dataModels = measurementTrend;
+                return await _dataHistoryMongoStore.GetMeasurementTrendItems(nodeId, correlationId);
             }
             else
             {
-                using (var context = _contextFactory.GetContext())
-                {
-                    var result = (from p in context.Parameters.AsNoTracking()
-                                  join t in context.FacilityTags.AsNoTracking()
-                                      on p.Address equals t.Address into tagGroup
-                                  from t in tagGroup.DefaultIfEmpty()
-                                  where (p.Poctype == 99
-                                  || GetNodeID(nodeId).Contains((short)p.Poctype)
-                                 || p.Poctype == GetNodeIDCase(nodeId)
-                                 && t == null
-                                 && p.ParamStandardType != null)
-                                  select new MeasurementTrendItemModel
-                                  {
-                                      ParamStandardType = p.ParamStandardType,
-                                      Address = p.Address,
-                                      Description = p.Description,
-                                      PhraseID = p.PhraseId,
-                                      ParameterType = p.Poctype == 99 ? "1" : "2"
-                                  }).AsEnumerable();
-
-                    result = result.Union(context.FacilityTags.AsNoTracking()
-                            .Where(x => x.GroupNodeId == nodeId
-                            && x.ParamStandardType != null)
-                            .Select(x => new MeasurementTrendItemModel
-                            {
-                                ParamStandardType = x.ParamStandardType,
-                                Address = x.Address,
-                                Description = x.Description,
-                                PhraseID = null,
-                                ParameterType = "2",
-                            }).AsEnumerable());
-
-                    var resultDataHistory = context.DataHistory.AsNoTracking().
-                                        Where(x => x.NodeID == nodeId)
-                                        .Select(x => new MeasurementTrendItemModel
-                                        { Address = x.Address }).Distinct().AsEnumerable();
-
-                    resultDataHistory = resultDataHistory.Union
-                                        (context.DataHistoryArchive.AsNoTracking()
-                                        .Where(x => x.NodeID == nodeId)
-                                        .Select(x => new MeasurementTrendItemModel
-                                        { Address = x.Address }).Distinct().AsEnumerable());
-                    resultDataHistory = resultDataHistory.DistinctBy(x => x.Address);
-
-                    var resultData = (from a in result
-                                      join d in resultDataHistory
-                                          on a.Address equals d.Address
-                                      join p in context.ParamStandardTypes.AsNoTracking()
-                                      on a.ParamStandardType equals p.ParamStandardType
-                                      join LocalePhrases1 in context.LocalePhrases.AsNoTracking()
-                                      on p.PhraseId equals LocalePhrases1.PhraseId
-                                      into phraseResult
-                                      join LocalePhrases2 in context.LocalePhrases.AsNoTracking()
-                                      on a.PhraseID equals LocalePhrases2.PhraseId
-                                      into resultPhrase
-                                      select new MeasurementTrendItemModel
-                                      {
-                                          ParamStandardType = p.ParamStandardType,
-                                          Name = p.Description,
-                                          UnitTypeID = p.UnitTypeId,
-                                          Address = a.Address,
-                                          Description = a.Description,
-                                      }).AsEnumerable();
-
-                    var groupdata = from d in resultData
-                                    group d by d.ParamStandardType into g
-                                    select new
-                                    {
-                                        g.Key,
-                                        Items = g.Select((item, index) => new { Item = item, Index = index + 1 }) // Assigning row numbers
-                                    };
-
-                    dataModels = groupdata.SelectMany(g => g.Items, (g, item) => new MeasurementTrendItemModel
-                    {
-                        Name = item.Item.Name,
-                        ParamStandardType = item.Item.ParamStandardType,
-                        UnitTypeID = item.Item.UnitTypeID,
-                        Address = item.Item.Address,
-                        Description = item.Item.Description,
-                    }).DistinctBy(x => x.ParamStandardType)
-                    .OrderBy(x => x.Name)
-                    .ThenBy(p => p.ParamStandardType)
-                    .ThenBy(p => p.Address)
-                    .ToList();
-
-                    _cache.Set<object>(cacheKey, dataModels);
-                }
+                return GetMeasurementTrendItemsUsingSQL(nodeId, correlationId);
             }
-
-            logger.WriteCId(Level.Trace, $"Finished {nameof(DataHistorySQLStore)} {nameof(GetMeasurementTrendItems)}", correlationId);
-
-            return dataModels;
         }
 
         /// <summary>
@@ -2137,7 +2032,124 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql
 
             return listControllerTrendDataModel.OrderBy(x => x.Date).ToList();
         }
-        #endregion
 
+        private IList<MeasurementTrendItemModel> GetMeasurementTrendItemsUsingSQL(string nodeId,string correlationId)
+        {
+            var logger = LoggerFactory.Create(LoggingModel.SQLStore);
+            logger.WriteCId(Level.Trace, $"Starting {nameof(DataHistorySQLStore)} {nameof(GetMeasurementTrendItems)}", correlationId);
+
+            IList<MeasurementTrendItemModel> dataModels =
+                new List<MeasurementTrendItemModel>();
+
+            string cacheKey = string.Empty;
+            using (var context = _contextFactory.GetContext())
+            {
+                var assetGuid = context.NodeMasters.AsNoTracking()
+                     .Where(x => x.NodeId == nodeId)
+                     .Select(x => x.AssetGuid).FirstOrDefault();
+
+                cacheKey = $"MeasurementTrendItems::{assetGuid}";
+            }
+
+            if (_cache.TryGetValue<IList<MeasurementTrendItemModel>>(cacheKey, out var measurementTrend))
+            {
+                dataModels = measurementTrend;
+            }
+            else
+            {
+                using (var context = _contextFactory.GetContext())
+                {
+                    var result = (from p in context.Parameters.AsNoTracking()
+                                  join t in context.FacilityTags.AsNoTracking()
+                                      on p.Address equals t.Address into tagGroup
+                                  from t in tagGroup.DefaultIfEmpty()
+                                  where (p.Poctype == 99
+                                  || GetNodeID(nodeId).Contains((short)p.Poctype)
+                                 || p.Poctype == GetNodeIDCase(nodeId)
+                                 && t == null
+                                 && p.ParamStandardType != null)
+                                  select new MeasurementTrendItemModel
+                                  {
+                                      ParamStandardType = p.ParamStandardType,
+                                      Address = p.Address,
+                                      Description = p.Description,
+                                      PhraseID = p.PhraseId,
+                                      ParameterType = p.Poctype == 99 ? "1" : "2"
+                                  }).AsEnumerable();
+
+                    result = result.Union(context.FacilityTags.AsNoTracking()
+                            .Where(x => x.GroupNodeId == nodeId
+                            && x.ParamStandardType != null)
+                            .Select(x => new MeasurementTrendItemModel
+                            {
+                                ParamStandardType = x.ParamStandardType,
+                                Address = x.Address,
+                                Description = x.Description,
+                                PhraseID = null,
+                                ParameterType = "2",
+                            }).AsEnumerable());
+
+                    var resultDataHistory = context.DataHistory.AsNoTracking().
+                                        Where(x => x.NodeID == nodeId)
+                                        .Select(x => new MeasurementTrendItemModel
+                                        { Address = x.Address }).Distinct().AsEnumerable();
+
+                    resultDataHistory = resultDataHistory.Union
+                                        (context.DataHistoryArchive.AsNoTracking()
+                                        .Where(x => x.NodeID == nodeId)
+                                        .Select(x => new MeasurementTrendItemModel
+                                        { Address = x.Address }).Distinct().AsEnumerable());
+                    resultDataHistory = resultDataHistory.DistinctBy(x => x.Address);
+
+                    var resultData = (from a in result
+                                      join d in resultDataHistory
+                                          on a.Address equals d.Address
+                                      join p in context.ParamStandardTypes.AsNoTracking()
+                                      on a.ParamStandardType equals p.ParamStandardType
+                                      join LocalePhrases1 in context.LocalePhrases.AsNoTracking()
+                                      on p.PhraseId equals LocalePhrases1.PhraseId
+                                      into phraseResult
+                                      join LocalePhrases2 in context.LocalePhrases.AsNoTracking()
+                                      on a.PhraseID equals LocalePhrases2.PhraseId
+                                      into resultPhrase
+                                      select new MeasurementTrendItemModel
+                                      {
+                                          ParamStandardType = p.ParamStandardType,
+                                          Name = p.Description,
+                                          UnitTypeID = p.UnitTypeId,
+                                          Address = a.Address,
+                                          Description = a.Description,
+                                      }).AsEnumerable();
+
+                    var groupdata = from d in resultData
+                                    group d by d.ParamStandardType into g
+                                    select new
+                                    {
+                                        g.Key,
+                                        Items = g.Select((item, index) => new { Item = item, Index = index + 1 }) // Assigning row numbers
+                                    };
+
+                    dataModels = groupdata.SelectMany(g => g.Items, (g, item) => new MeasurementTrendItemModel
+                    {
+                        Name = item.Item.Name,
+                        ParamStandardType = item.Item.ParamStandardType,
+                        UnitTypeID = item.Item.UnitTypeID,
+                        Address = item.Item.Address,
+                        Description = item.Item.Description,
+                    }).DistinctBy(x => x.ParamStandardType)
+                    .OrderBy(x => x.Name)
+                    .ThenBy(p => p.ParamStandardType)
+                    .ThenBy(p => p.Address)
+                    .ToList();
+
+                    _cache.Set<object>(cacheKey, dataModels);
+                }
+            }
+
+            logger.WriteCId(Level.Trace, $"Finished {nameof(DataHistorySQLStore)} {nameof(GetMeasurementTrendItems)}", correlationId);
+
+            return dataModels;
+        }
+        #endregion
     }
 }

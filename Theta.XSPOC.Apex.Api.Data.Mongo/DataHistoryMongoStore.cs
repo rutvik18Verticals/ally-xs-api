@@ -5,11 +5,14 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Theta.XSPOC.Apex.Api.Data.Entity.EntitySetup;
 using Theta.XSPOC.Apex.Api.Data.Influx.Services;
 using Theta.XSPOC.Apex.Api.Data.Models;
+using Theta.XSPOC.Apex.Api.Data.Models.MongoCollection.Lookup;
 using Theta.XSPOC.Apex.Api.Data.Models.MongoCollection.Parameter;
 using Theta.XSPOC.Apex.Kernel.Logging;
 using MongoAssetCollection = Theta.XSPOC.Apex.Api.Data.Models.MongoCollection.Asset.Asset;
+using Parameters = Theta.XSPOC.Apex.Api.Data.Models.MongoCollection.Parameter.Parameters;
 
 namespace Theta.XSPOC.Apex.Api.Data.Mongo
 {
@@ -228,14 +231,111 @@ namespace Theta.XSPOC.Apex.Api.Data.Mongo
         }
 
         /// <summary>
-        /// Gets the <seealso cref="IList{MeasurementTrendDataModel}"/>.
+        /// Gets the <seealso cref="IList{MeasurementTrendItemModel}"/> from MongoDB.
         /// </summary>
         /// <param name="nodeId">The node id.</param>
-        /// <param name="correlationId"></param>
-        /// <returns>The <seealso cref="IList{MeasurementTrendDataModel}"/>.</returns>
-        public IList<MeasurementTrendItemModel> GetMeasurementTrendItems(string nodeId, string correlationId)
+        /// <param name="correlationId">The correlation id.</param>
+        /// <returns>The <seealso cref="IList{MeasurementTrendItemModel}"/>.</returns>
+        public async Task<IList<MeasurementTrendItemModel>> GetMeasurementTrendItems(string nodeId, string correlationId)
         {
-            throw new NotImplementedException();
+            var parametersCollection = _database.GetCollection<Parameters>("Parameters");
+            var assetsCollection = _database.GetCollection<MongoAssetCollection>("Asset");
+
+            // Fetch asset data
+            var assetData = await assetsCollection.Find(x => x.LegacyId["NodeId"] == nodeId).FirstOrDefaultAsync();
+            if (assetData == null)
+            {
+                return Enumerable.Empty<MeasurementTrendItemModel>().ToList();
+            }
+
+            string pocType = assetData.POCType.LegacyId["POCTypesId"];
+
+            // Filter for facility tags
+            var facilityTagFilter = Builders<Parameters>.Filter.And(
+                Builders<Parameters>.Filter.Eq(p => p.ParameterType, "Facility"),
+                Builders<Parameters>.Filter.Eq(p => p.Enabled, true),
+                Builders<Parameters>.Filter.Eq(p => p.LegacyId["NodeId"], nodeId),
+                Builders<Parameters>.Filter.Ne(p => p.ParamStandardType, null)
+            );
+
+            var facilityTags = await parametersCollection.Find(facilityTagFilter).ToListAsync();
+            var facilityTagAddresses = facilityTags.Select(ft => ft.Address).ToList();
+            bool facilityTagsExist = facilityTagAddresses.Any();
+
+            // Filter for parameters
+            var parameterFilter = Builders<Parameters>.Filter.And(
+                Builders<Parameters>.Filter.Ne(p => p.ParamStandardType, null),
+                Builders<Parameters>.Filter.Or(
+                    Builders<Parameters>.Filter.Eq(p => p.LegacyId["POCType"], pocType),
+                    Builders<Parameters>.Filter.Eq(p => p.LegacyId["POCType"], "99"),
+                    Builders<Parameters>.Filter.And(
+                        Builders<Parameters>.Filter.Eq(p => p.LegacyId["POCType"], "8"),
+                        Builders<Parameters>.Filter.Where(p => p.LegacyId["POCType"] == "17")
+                    )
+                )
+            );
+
+            var parameters = await parametersCollection.Find(parameterFilter).ToListAsync();
+
+            // Map parameters and facility tags to MeasurementTrendItemModel
+            var parameterItems = parameters.Select(p => new MeasurementTrendItemModel
+            {
+                ParamStandardType = p.ParamStandardType?.LegacyId["ParamStandardTypesId"] != null
+                                    ? int.Parse(p.ParamStandardType.LegacyId["ParamStandardTypesId"])
+                                    : null,
+                Address = p.Address,
+                Description = p.Description,
+                PhraseID = (p.ParameterDocument as ParameterDetails)?.PhraseId,
+                ParameterType = p.LegacyId["POCType"] == "99" ? "1" : "2"
+            }).ToList();
+
+            var facilityTagItems = facilityTags.Select(ft => new MeasurementTrendItemModel
+            {
+                ParamStandardType = ft.ParamStandardType?.LegacyId["ParamStandardTypesId"] != null
+                                    ? int.Parse(ft.ParamStandardType.LegacyId["ParamStandardTypesId"])
+                                    : null,
+                Address = ft.Address,
+                Description = ft.Description,
+                PhraseID = null,
+                ParameterType = "2"
+            }).ToList();
+
+            // Combine parameters and facility tags
+            var combinedItems = parameterItems.Concat(facilityTagItems).ToList();
+
+            // Fetch ParamStandardTypes for additional details
+            var paramStandardTypesCollection = _database.GetCollection<ParamStandardTypes>("ParamStandardTypes");
+            var paramStandardTypes = await paramStandardTypesCollection.Find(Builders<ParamStandardTypes>.Filter.Empty).ToListAsync();
+
+            // Join combined items with ParamStandardTypes
+            var resultData = (from item in combinedItems
+                              join pst in paramStandardTypes on item.ParamStandardType equals pst.ParamStandardType
+                              select new MeasurementTrendItemModel
+                              {
+                                  ParamStandardType = pst.ParamStandardType,
+                                  Name = pst.Description,
+                                  UnitTypeID = pst.UnitTypeId,
+                                  Address = item.Address,
+                                  Description = item.Description
+                              }).ToList();
+
+            // Group and order the result
+            var measurementTrendItems = resultData.GroupBy(d => d.ParamStandardType)
+                .SelectMany(g => g.Select((item, index) => new MeasurementTrendItemModel
+                {
+                    Name = item.Name,
+                    ParamStandardType = item.ParamStandardType,
+                    UnitTypeID = item.UnitTypeID,
+                    Address = item.Address,
+                    Description = item.Description
+                }))
+                .Distinct()
+                .OrderBy(x => x.Name)
+                .ThenBy(x => x.ParamStandardType)
+                .ThenBy(x => x.Address)
+                .ToList();
+
+            return measurementTrendItems;
         }
 
         private float? ConvertToFloat(object value)
