@@ -315,59 +315,14 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql
         /// <returns>The <seealso cref="ControllerTrendItemModel"/>.</returns>
         public IList<ControllerTrendItemModel> GetControllerTrendItems(string nodeId, int pocType, string correlationId)
         {
-            var logger = LoggerFactory.Create(LoggingModel.SQLStore);
-            logger.WriteCId(Level.Trace,
-                $"Starting {nameof(DataHistorySQLStore)} {nameof(GetControllerTrendItems)}",
-                correlationId);
-
-            using (var context = _contextFactory.GetContext())
+            bool isInfluxEnabled = _configuration.GetValue("EnableInflux", false);
+            if (isInfluxEnabled)
             {
-                var query = context.Parameters.AsNoTracking()
-                    .Where(p => (pocType == 99 || p.Poctype == pocType) &&
-                    p.ParamStandardType == null &&
-                    !context.FacilityTags.AsNoTracking().Where(t => t.GroupNodeId == nodeId &&
-                    t.Address == p.Address && t.Bit == 0).Any())
-                    .Select(p => new ControllerTrendItemModel()
-                    {
-                        Name = p.Description,
-                        Description = context.LocalePhrases
-                        .Where(l => l.PhraseId == p.PhraseId)
-                        .Select(l => l.English)
-                        .FirstOrDefault() ?? p.Description,
-                        Address = p.Address,
-                        UnitType = p.UnitType,
-                        FacilityTag = 0,
-                        Tag = null
-                    }).AsEnumerable();
-
-                query = query.Union(context.FacilityTags.AsNoTracking()
-                    .Where(t => t.Description != null && t.GroupNodeId == nodeId &&
-                        t.ParamStandardType == null)
-                        .Select(t => new ControllerTrendItemModel()
-                        {
-                            Name = t.Description,
-                            Description = t.Description ?? string.Empty,
-                            Address = t.Address,
-                            UnitType = t.UnitType,
-                            FacilityTag = 1,
-                            Tag = t.Tag
-                        })).AsEnumerable();
-
-                var result = query.Join(context.DataHistory.AsNoTracking()
-                        .Where(dh => dh.NodeID == nodeId)
-                        .Select(dh => dh.Address)
-                        .Union(context.DataHistoryArchive
-                            .Where(dha => dha.NodeID == nodeId)
-                            .Select(dha => dha.Address)),
-                        p => p.Address,
-                        h => h,
-                        (p, h) => p)
-                    .ToList();
-
-                logger.WriteCId(Level.Trace, $"Finished {nameof(DataHistorySQLStore)}" +
-               $" {nameof(GetControllerTrendItems)}", correlationId);
-
-                return result;
+                return _dataHistoryMongoStore.GetControllerTrendItems(nodeId, pocType, correlationId);
+            }
+            else
+            {
+                return GetControllerTrendItemsUsingSQL(nodeId, pocType, correlationId);
             }
         }
 
@@ -2149,6 +2104,64 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql
             logger.WriteCId(Level.Trace, $"Finished {nameof(DataHistorySQLStore)} {nameof(GetMeasurementTrendItems)}", correlationId);
 
             return dataModels;
+        }
+
+        private IList<ControllerTrendItemModel> GetControllerTrendItemsUsingSQL(string nodeId, int pocType, string correlationId)
+        {
+            var logger = LoggerFactory.Create(LoggingModel.SQLStore);
+            logger.WriteCId(Level.Trace,
+                $"Starting {nameof(DataHistorySQLStore)} {nameof(GetControllerTrendItems)}",
+                correlationId);
+
+            using (var context = _contextFactory.GetContext())
+            {
+                var query = context.Parameters.AsNoTracking()
+                    .Where(p => (pocType == 99 || p.Poctype == pocType) &&
+                    p.ParamStandardType == null &&
+                    !context.FacilityTags.AsNoTracking().Where(t => t.GroupNodeId == nodeId &&
+                    t.Address == p.Address && t.Bit == 0).Any())
+                    .Select(p => new ControllerTrendItemModel()
+                    {
+                        Name = p.Description,
+                        Description = context.LocalePhrases
+                        .Where(l => l.PhraseId == p.PhraseId)
+                        .Select(l => l.English)
+                        .FirstOrDefault() ?? p.Description,
+                        Address = p.Address,
+                        UnitType = p.UnitType,
+                        FacilityTag = 0,
+                        Tag = null
+                    }).AsEnumerable();
+
+                query = query.Union(context.FacilityTags.AsNoTracking()
+                    .Where(t => t.Description != null && t.GroupNodeId == nodeId &&
+                        t.ParamStandardType == null)
+                        .Select(t => new ControllerTrendItemModel()
+                        {
+                            Name = t.Description,
+                            Description = t.Description ?? string.Empty,
+                            Address = t.Address,
+                            UnitType = t.UnitType,
+                            FacilityTag = 1,
+                            Tag = t.Tag
+                        })).AsEnumerable();
+
+                var result = query.Join(context.DataHistory.AsNoTracking()
+                        .Where(dh => dh.NodeID == nodeId)
+                        .Select(dh => dh.Address)
+                        .Union(context.DataHistoryArchive
+                            .Where(dha => dha.NodeID == nodeId)
+                            .Select(dha => dha.Address)),
+                        p => p.Address,
+                        h => h,
+                        (p, h) => p)
+                    .ToList();
+
+                logger.WriteCId(Level.Trace, $"Finished {nameof(DataHistorySQLStore)}" +
+               $" {nameof(GetControllerTrendItems)}", correlationId);
+
+                return result;
+            }
         }
         #endregion
     }
