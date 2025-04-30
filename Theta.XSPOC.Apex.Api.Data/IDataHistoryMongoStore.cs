@@ -29,7 +29,7 @@ namespace Theta.XSPOC.Apex.Api.Data
         /// <param name="nodeId">The node id.</param>
         /// <param name="correlationId"></param>
         /// <returns>The <seealso cref="IList{MeasurementTrendDataModel}"/>.</returns>
-        IList<MeasurementTrendItemModel> GetMeasurementTrendItems(string nodeId, string correlationId);
+        Task<IList<MeasurementTrendItemModel>> GetMeasurementTrendItems(string nodeId, string correlationId);
 
         /// <summary>
         /// Get the controller trend item by node id and poc type.
