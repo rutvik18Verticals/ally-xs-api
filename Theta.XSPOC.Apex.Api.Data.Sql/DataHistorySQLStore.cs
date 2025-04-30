@@ -176,7 +176,7 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql
         /// <param name="nodeId">The node id.</param>
         /// <param name="correlationId"></param>
         /// <returns>The <seealso cref="IList{MeasurementTrendItemModel}"/>.</returns>
-        public async Task<IList<MeasurementTrendItemModel>> GetMeasurementTrendItems(string nodeId, string correlationId)
+        public async Task<IList<MeasurementTrendItemM GetMeasurementTrendItems(string nodeId, string correlationId)
         {
             bool isInfluxEnabled = _configuration.GetValue("EnableInflux", false);
             if (isInfluxEnabled)
