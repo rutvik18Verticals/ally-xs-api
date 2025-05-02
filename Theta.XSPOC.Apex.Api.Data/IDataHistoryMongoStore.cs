@@ -59,6 +59,6 @@ namespace Theta.XSPOC.Apex.Api.Data
         /// <param name="numberOfDays">The number of days.</param>
         /// <param name="correlationId"></param>
         /// <returns>The <see cref="DowntimeByWellsModel"/>.</returns>
-        DowntimeByWellsModel GetDowntime(IList<string> nodeIds, int numberOfDays, string correlationId);
+        Task<DowntimeByWellsModel> GetDowntime(IList<string> nodeIds, int numberOfDays, string correlationId);
     }
 }

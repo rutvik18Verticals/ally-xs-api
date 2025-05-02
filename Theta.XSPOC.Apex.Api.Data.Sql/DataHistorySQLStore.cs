@@ -176,7 +176,7 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql
         /// <param name="nodeId">The node id.</param>
         /// <param name="correlationId"></param>
         /// <returns>The <seealso cref="IList{MeasurementTrendItemModel}"/>.</returns>
-        public async Task<IList<MeasurementTrendItemM GetMeasurementTrendItems(string nodeId, string correlationId)
+        public async Task<IList<MeasurementTrendItemModel>> GetMeasurementTrendItems(string nodeId, string correlationId)
         {
             bool isInfluxEnabled = _configuration.GetValue("EnableInflux", false);
             if (isInfluxEnabled)
@@ -1567,143 +1567,16 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql
         /// <param name="numberOfDays">The number of days.</param>
         /// <param name="correlationId"></param>
         /// <returns>The <see cref="DowntimeByWellsModel"/>.</returns>
-        public DowntimeByWellsModel GetDowntime(IList<string> nodeIds, int numberOfDays, string correlationId)
+        public Task<DowntimeByWellsModel> GetDowntime(IList<string> nodeIds, int numberOfDays, string correlationId)
         {
-            var logger = LoggerFactory.Create(LoggingModel.SQLStore);
-            logger.WriteCId(Level.Trace, $"Starting {nameof(DataHistorySQLStore)} {nameof(GetDowntime)}", correlationId);
-
-            const int pstFrequency = 2;
-            const int pstRunTime = 179;
-            const int pstIdleTime = 180;
-            const int pstCycles = 181;
-            const int pstGasInjectionRate = 191;
-            const int applicationRodPump = 3;
-            const int applicationESP = 4;
-            const int applicationGL = 7;
-
-            var numberOfRecentDays = DateTime.UtcNow.Date.AddDays(-numberOfDays);
-
-            using (var context = _contextFactory.GetContext())
+            bool isInfluxEnabled = _configuration.GetValue("EnableInflux", false);
+            if (isInfluxEnabled)
             {
-                var queryRunTime = context.DataHistory.AsNoTracking().Where(x => x.Value > 0)
-                    .Join(context.Parameters.Where(x => x.ParamStandardType == pstRunTime), dh => dh.Address, p => p.Address, (dh, p) => new
-                    {
-                        DataHistoryRuntime = dh,
-                    });
-
-                var queryIdleTime = context.DataHistory.AsNoTracking()
-                    .Join(context.Parameters.Where(x => x.ParamStandardType == pstIdleTime), dh => dh.Address, p => p.Address, (dh, p) => new
-                    {
-                        DataHistoryIdleTime = dh,
-                    });
-
-                var queryCycles = context.DataHistory.AsNoTracking()
-                    .Join(context.Parameters.Where(x => x.ParamStandardType == pstCycles), dh => dh.Address, p => p.Address, (dh, p) => new
-                    {
-                        DataHistoryCycles = dh,
-                    });
-
-                var rodPumpResultPrimary = queryRunTime.Join(queryIdleTime, x => new
-                {
-                    x.DataHistoryRuntime.NodeID,
-                    x.DataHistoryRuntime.Date
-                }, x => new
-                {
-                    x.DataHistoryIdleTime.NodeID,
-                    x.DataHistoryIdleTime.Date
-                }, (x, dh) => new
-                {
-                    x.DataHistoryRuntime,
-                    dh.DataHistoryIdleTime,
-                })
-                    .Join(queryCycles, x => new
-                    {
-                        x.DataHistoryRuntime.NodeID,
-                        x.DataHistoryRuntime.Date,
-                    }, x => new
-                    {
-                        x.DataHistoryCycles.NodeID,
-                        x.DataHistoryCycles.Date,
-                    }, (x, dh) => new
-                    {
-                        x.DataHistoryRuntime,
-                        x.DataHistoryIdleTime,
-                        dh.DataHistoryCycles
-                    })
-                    .Where(x => x.DataHistoryRuntime.Date > numberOfRecentDays)
-                     .Join(context.NodeMasters.AsNoTracking().Where(x => x.ApplicationId == applicationRodPump && nodeIds.Contains(x.NodeId)), x => x.DataHistoryRuntime.NodeID, nm => nm.NodeId,
-                        (x, nm) => new
-                        {
-                            x.DataHistoryRuntime,
-                            x.DataHistoryIdleTime,
-                            x.DataHistoryCycles,
-                            NodeMaster = nm,
-                        })
-                    .Select(x => new
-                    {
-                        NodeId = x.DataHistoryRuntime.NodeID,
-                        Runtime = x.DataHistoryRuntime.Value,
-                        IdleTime = x.DataHistoryIdleTime.Value,
-                        Cycles = x.DataHistoryCycles.Value,
-                        x.DataHistoryRuntime.Date
-                    })
-                    .ToList();
-
-                var rodPumpResult = rodPumpResultPrimary.Distinct().Select(x => new DowntimeByWellsRodPumpModel()
-                {
-                    Id = x.NodeId,
-                    Runtime = x.Runtime,
-                    IdleTime = x.IdleTime,
-                    Cycles = x.Cycles,
-                    Date = x.Date,
-                });
-
-                var espResult = context.DataHistory.AsNoTracking().Where(x => nodeIds.Contains(x.NodeID) && x.Date > numberOfRecentDays)
-                    .Join(context.NodeMasters.AsNoTracking().Where(x => x.ApplicationId == applicationESP), dh => dh.NodeID, nm => nm.NodeId, (dh, nm) => new
-                    {
-                        DataHistory = dh,
-                        NodeMaster = nm,
-                    })
-                    .Join(context.Parameters.AsNoTracking().Where(x => x.ParamStandardType == pstFrequency), x => x.DataHistory.Address, p => p.Address, (x, p) => new
-                    {
-                        x.DataHistory,
-                    })
-                    .ToList()
-                    .Select(x => new DowntimeByWellsValueModel()
-                    {
-                        Id = x.DataHistory.NodeID,
-                        Value = x.DataHistory.Value,
-                        Date = x.DataHistory.Date,
-                    });
-
-                var glResult = context.DataHistory.AsNoTracking().Where(x => nodeIds.Contains(x.NodeID) && x.Date > numberOfRecentDays)
-                    .Join(context.NodeMasters.AsNoTracking().Where(x => x.ApplicationId == applicationGL), dh => dh.NodeID, nm => nm.NodeId, (dh, nm) => new
-                    {
-                        DataHistory = dh,
-                        NodeMaster = nm,
-                    })
-                    .Join(context.Parameters.AsNoTracking().Where(x => x.ParamStandardType == pstGasInjectionRate), x => x.DataHistory.Address, p => p.Address, (x, p) => new
-                    {
-                        x.DataHistory,
-                    })
-                    .ToList()
-                    .Select(x => new DowntimeByWellsValueModel()
-                    {
-                        Id = x.DataHistory.NodeID,
-                        Value = x.DataHistory.Value,
-                        Date = x.DataHistory.Date,
-                    });
-
-                var result = new DowntimeByWellsModel()
-                {
-                    RodPump = rodPumpResult.ToList(),
-                    ESP = espResult.ToList(),
-                    GL = glResult.ToList(),
-                };
-
-                logger.WriteCId(Level.Trace, $"Finished {nameof(DataHistorySQLStore)} {nameof(GetDowntime)}", correlationId);
-
-                return result;
+                return _dataHistoryMongoStore.GetDowntime(nodeIds, numberOfDays, correlationId);
+            }
+            else
+            {
+                return GetDowntimeUsingSQL(nodeIds, numberOfDays, correlationId);
             }
         }
 
@@ -1988,7 +1861,7 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql
             return listControllerTrendDataModel.OrderBy(x => x.Date).ToList();
         }
 
-        private IList<MeasurementTrendItemModel> GetMeasurementTrendItemsUsingSQL(string nodeId,string correlationId)
+        private IList<MeasurementTrendItemModel> GetMeasurementTrendItemsUsingSQL(string nodeId, string correlationId)
         {
             var logger = LoggerFactory.Create(LoggingModel.SQLStore);
             logger.WriteCId(Level.Trace, $"Starting {nameof(DataHistorySQLStore)} {nameof(GetMeasurementTrendItems)}", correlationId);
@@ -2162,6 +2035,146 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql
 
                 return result;
             }
+        }
+        private Task<DowntimeByWellsModel> GetDowntimeUsingSQL(IList<string> nodeIds, int numberOfDays, string correlationId)
+        {
+            var logger = LoggerFactory.Create(LoggingModel.SQLStore);
+            logger.WriteCId(Level.Trace, $"Starting {nameof(DataHistorySQLStore)} {nameof(GetDowntime)}", correlationId);
+
+            const int pstFrequency = 2;
+            const int pstRunTime = 179;
+            const int pstIdleTime = 180;
+            const int pstCycles = 181;
+            const int pstGasInjectionRate = 191;
+            const int applicationRodPump = 3;
+            const int applicationESP = 4;
+            const int applicationGL = 7;
+
+            var numberOfRecentDays = DateTime.UtcNow.Date.AddDays(-numberOfDays);
+
+            using (var context = _contextFactory.GetContext())
+            {
+                var queryRunTime = context.DataHistory.AsNoTracking().Where(x => x.Value > 0)
+                    .Join(context.Parameters.Where(x => x.ParamStandardType == pstRunTime), dh => dh.Address, p => p.Address, (dh, p) => new
+                    {
+                        DataHistoryRuntime = dh,
+                    });
+
+                var queryIdleTime = context.DataHistory.AsNoTracking()
+                    .Join(context.Parameters.Where(x => x.ParamStandardType == pstIdleTime), dh => dh.Address, p => p.Address, (dh, p) => new
+                    {
+                        DataHistoryIdleTime = dh,
+                    });
+
+                var queryCycles = context.DataHistory.AsNoTracking()
+                    .Join(context.Parameters.Where(x => x.ParamStandardType == pstCycles), dh => dh.Address, p => p.Address, (dh, p) => new
+                    {
+                        DataHistoryCycles = dh,
+                    });
+
+                var rodPumpResultPrimary = queryRunTime.Join(queryIdleTime, x => new
+                {
+                    x.DataHistoryRuntime.NodeID,
+                    x.DataHistoryRuntime.Date
+                }, x => new
+                {
+                    x.DataHistoryIdleTime.NodeID,
+                    x.DataHistoryIdleTime.Date
+                }, (x, dh) => new
+                {
+                    x.DataHistoryRuntime,
+                    dh.DataHistoryIdleTime,
+                })
+                    .Join(queryCycles, x => new
+                    {
+                        x.DataHistoryRuntime.NodeID,
+                        x.DataHistoryRuntime.Date,
+                    }, x => new
+                    {
+                        x.DataHistoryCycles.NodeID,
+                        x.DataHistoryCycles.Date,
+                    }, (x, dh) => new
+                    {
+                        x.DataHistoryRuntime,
+                        x.DataHistoryIdleTime,
+                        dh.DataHistoryCycles
+                    })
+                    .Where(x => x.DataHistoryRuntime.Date > numberOfRecentDays)
+                     .Join(context.NodeMasters.AsNoTracking().Where(x => x.ApplicationId == applicationRodPump && nodeIds.Contains(x.NodeId)), x => x.DataHistoryRuntime.NodeID, nm => nm.NodeId,
+                        (x, nm) => new
+                        {
+                            x.DataHistoryRuntime,
+                            x.DataHistoryIdleTime,
+                            x.DataHistoryCycles,
+                            NodeMaster = nm,
+                        })
+                    .Select(x => new
+                    {
+                        NodeId = x.DataHistoryRuntime.NodeID,
+                        Runtime = x.DataHistoryRuntime.Value,
+                        IdleTime = x.DataHistoryIdleTime.Value,
+                        Cycles = x.DataHistoryCycles.Value,
+                        x.DataHistoryRuntime.Date
+                    })
+                    .ToList();
+
+                var rodPumpResult = rodPumpResultPrimary.Distinct().Select(x => new DowntimeByWellsRodPumpModel()
+                {
+                    Id = x.NodeId,
+                    Runtime = x.Runtime,
+                    IdleTime = x.IdleTime,
+                    Cycles = x.Cycles,
+                    Date = x.Date,
+                });
+
+                var espResult = context.DataHistory.AsNoTracking().Where(x => nodeIds.Contains(x.NodeID) && x.Date > numberOfRecentDays)
+                    .Join(context.NodeMasters.AsNoTracking().Where(x => x.ApplicationId == applicationESP), dh => dh.NodeID, nm => nm.NodeId, (dh, nm) => new
+                    {
+                        DataHistory = dh,
+                        NodeMaster = nm,
+                    })
+                    .Join(context.Parameters.AsNoTracking().Where(x => x.ParamStandardType == pstFrequency), x => x.DataHistory.Address, p => p.Address, (x, p) => new
+                    {
+                        x.DataHistory,
+                    })
+                    .ToList()
+                    .Select(x => new DowntimeByWellsValueModel()
+                    {
+                        Id = x.DataHistory.NodeID,
+                        Value = x.DataHistory.Value,
+                        Date = x.DataHistory.Date,
+                    });
+
+                var glResult = context.DataHistory.AsNoTracking().Where(x => nodeIds.Contains(x.NodeID) && x.Date > numberOfRecentDays)
+                    .Join(context.NodeMasters.AsNoTracking().Where(x => x.ApplicationId == applicationGL), dh => dh.NodeID, nm => nm.NodeId, (dh, nm) => new
+                    {
+                        DataHistory = dh,
+                        NodeMaster = nm,
+                    })
+                    .Join(context.Parameters.AsNoTracking().Where(x => x.ParamStandardType == pstGasInjectionRate), x => x.DataHistory.Address, p => p.Address, (x, p) => new
+                    {
+                        x.DataHistory,
+                    })
+                    .ToList()
+                    .Select(x => new DowntimeByWellsValueModel()
+                    {
+                        Id = x.DataHistory.NodeID,
+                        Value = x.DataHistory.Value,
+                        Date = x.DataHistory.Date,
+                    });
+
+                var result = new DowntimeByWellsModel()
+                {
+                    RodPump = rodPumpResult.ToList(),
+                    ESP = espResult.ToList(),
+                    GL = glResult.ToList(),
+                };
+
+                logger.WriteCId(Level.Trace, $"Finished {nameof(DataHistorySQLStore)} {nameof(GetDowntime)}", correlationId);
+
+                return Task.FromResult(result);
+            }
+
         }
         #endregion
     }
