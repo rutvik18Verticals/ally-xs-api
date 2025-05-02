@@ -8,6 +8,8 @@ using System.Threading.Tasks;
 using Theta.XSPOC.Apex.Api.Data.Entity.EntitySetup;
 using Theta.XSPOC.Apex.Api.Data.Influx.Services;
 using Theta.XSPOC.Apex.Api.Data.Models;
+using Theta.XSPOC.Apex.Api.Data.Models.MongoCollection.Asset;
+using Theta.XSPOC.Apex.Api.Data.Models.MongoCollection.Customers;
 using Theta.XSPOC.Apex.Api.Data.Models.MongoCollection.Lookup;
 using Theta.XSPOC.Apex.Api.Data.Models.MongoCollection.Parameter;
 using Theta.XSPOC.Apex.Kernel.Logging;
@@ -196,9 +198,198 @@ namespace Theta.XSPOC.Apex.Api.Data.Mongo
         /// <param name="numberOfDays">The number of days.</param>
         /// <param name="correlationId"></param>
         /// <returns>The <see cref="DowntimeByWellsModel"/>.</returns>
-        public DowntimeByWellsModel GetDowntime(IList<string> nodeIds, int numberOfDays, string correlationId)
+        public async Task<DowntimeByWellsModel> GetDowntime(IList<string> nodeIds, int numberOfDays, string correlationId)
         {
-            throw new NotImplementedException();
+            const int pstRunTime = 179;
+            const int pstIdleTime = 180;
+            const int pstCycles = 181;
+            const int pstFrequency = 2;
+            const int pstGasInjectionRate = 191;
+
+            const int applicationRodPump = 3;
+            const int applicationESP = 4;
+            const int applicationGL = 7;
+
+            var startDate = DateTime.UtcNow.Date.AddDays(-numberOfDays);
+            var endDate = DateTime.UtcNow;
+
+            var assetsCollection = _database.GetCollection<MongoAssetCollection>("Asset");
+            var parametersCollection = _database.GetCollection<Parameters>("Parameters");
+
+            // Fetch asset data for the given node IDs
+            var assetFilter = Builders<MongoAssetCollection>.Filter.In(a => a.LegacyId["NodeId"], nodeIds);
+            var assets = await assetsCollection.Find(assetFilter).ToListAsync();
+
+            if (!assets.Any())
+            {
+                return new DowntimeByWellsModel
+                {
+                    RodPump = new List<DowntimeByWellsRodPumpModel>(),
+                    ESP = new List<DowntimeByWellsValueModel>(),
+                    GL = new List<DowntimeByWellsValueModel>()
+                };
+            }
+
+            // Extract asset GUIDs
+            var assetGuids = assets
+                .Select(a => Guid.TryParse(a.LegacyId?["AssetGUID"], out var guid) ? guid : Guid.Empty)
+            .Where(g => g != Guid.Empty)
+            .ToList();
+
+            if (!assetGuids.Any())
+            {
+                return new DowntimeByWellsModel
+                {
+                    RodPump = new List<DowntimeByWellsRodPumpModel>(),
+                    ESP = new List<DowntimeByWellsValueModel>(),
+                    GL = new List<DowntimeByWellsValueModel>()
+                };
+            }
+
+            // Fetch parameters for the given node IDs
+            var parameterFilter = Builders<Parameters>.Filter.And(
+                Builders<Parameters>.Filter.In(p => p.LegacyId["NodeId"], nodeIds),
+                Builders<Parameters>.Filter.Eq(p => p.Enabled, true),
+                Builders<Parameters>.Filter.In(p => p.ParamStandardType.LegacyId["ParamStandardTypesId"],
+                    new[] { pstRunTime.ToString(), pstIdleTime.ToString(), pstCycles.ToString(), pstFrequency.ToString(), pstGasInjectionRate.ToString() })
+            );
+
+            var parameters = await parametersCollection.Find(parameterFilter).ToListAsync();
+
+            if (!parameters.Any())
+            {
+                return new DowntimeByWellsModel
+                {
+                    RodPump = new List<DowntimeByWellsRodPumpModel>(),
+                    ESP = new List<DowntimeByWellsValueModel>(),
+                    GL = new List<DowntimeByWellsValueModel>()
+                };
+            }
+
+            // Prepare downtime filters
+            var downtimeFilters = parameters.Select(p => new DowntimeFiltersInflux
+            {
+                AssetIds = assetGuids,
+                ParamStandardType = new List<string> { p.ParamStandardType.LegacyId["ParamStandardTypesId"] }
+            }).ToList();
+
+            // Fetch downtime data using the GetDowntimeAsync method
+            var downtimeData = await _getDataHistoryItemsService.GetDowntimeAsync(downtimeFilters, startDate.ToString(), endDate.ToString());
+
+            if (!downtimeData.Any())
+            {
+                return new DowntimeByWellsModel
+                {
+                    RodPump = new List<DowntimeByWellsRodPumpModel>(),
+                    ESP = new List<DowntimeByWellsValueModel>(),
+                    GL = new List<DowntimeByWellsValueModel>()
+                };
+            }
+
+            var rodPumpResult = downtimeData
+                .Where(d => d.ParamStandardType == pstRunTime.ToString() || d.ParamStandardType == pstIdleTime.ToString() || d.ParamStandardType == pstCycles.ToString())
+                .GroupBy(d => new { d.Id, d.Date })
+                .Select(g => new DowntimeByWellsRodPumpModel
+                {
+                    Id = g.Key.Id.ToString(),
+                    Date = g.Key.Date,
+                    Runtime = g.Where(d => d.ParamStandardType == pstRunTime.ToString()).Sum(d => d.Value),
+                    IdleTime = g.Where(d => d.ParamStandardType == pstIdleTime.ToString()).Sum(d => d.Value),
+                    Cycles = g.Where(d => d.ParamStandardType == pstCycles.ToString()).Sum(d => d.Value)
+                })
+                .ToList();
+
+            var espResult = downtimeData
+                .Where(d => d.ParamStandardType == pstFrequency.ToString())
+                .Select(d => new DowntimeByWellsValueModel
+                {
+                    Id = d.Id.ToString(),
+                    Date = d.Date,
+                    Value = d.Value
+                })
+                .ToList();
+
+            // Process downtime data for GL
+            var glResult = downtimeData
+                .Where(d => d.ParamStandardType == pstGasInjectionRate.ToString())
+                .Select(d => new DowntimeByWellsValueModel
+                {
+                    Id = d.Id.ToString(),
+                    Date = d.Date,
+                    Value = d.Value
+                })
+                .ToList();
+
+            foreach (var asset in assets)
+            {
+                var pocType = asset.POCType?.LegacyId?["POCTypesId"];
+                Guid assetGuid = Guid.TryParse(asset.LegacyId?["AssetGUID"], out var ag) ? ag : Guid.Empty;
+
+                if (assetGuid == Guid.Empty || string.IsNullOrEmpty(pocType))
+                {
+                    continue;
+                }
+                int appId = Convert.ToInt32(asset.LegacyId?["AssetGUID"]);
+
+                if (appId == applicationRodPump)
+                {
+                    // Fetch data for Rod Pump
+                    var data = await _getDataHistoryItemsService.GetDowntimeAsync(downtimeFilters, startDate.ToString(), endDate.ToString());
+
+                    var grouped = data.GroupBy(x => new { x.Id, x.Date });
+
+                    foreach (var g in grouped)
+                    {
+                        var runtime = g.FirstOrDefault(x => x.Id == pstRunTime.ToString())?.Value ?? 0;
+                        var idle = g.FirstOrDefault(x => x.Id == pstIdleTime.ToString())?.Value ?? 0;
+                        var cycles = g.FirstOrDefault(x => x.Id == pstCycles.ToString())?.Value ?? 0;
+
+                        if (runtime > 0)
+                        {
+                            rodPumpResult.Add(new DowntimeByWellsRodPumpModel
+                            {
+                                Id = g.Key.Id.ToString(),
+                                Runtime = (float)runtime,
+                                IdleTime = (float)idle,
+                                Cycles = (float)cycles,
+                                Date = g.Key.Date
+                            });
+                        }
+                    }
+                }
+                else if (appId == applicationESP)
+                {
+                    // Fetch data for ESP
+                    var data = await _getDataHistoryItemsService.GetDowntimeAsync(downtimeFilters, startDate.ToString(), endDate.ToString());
+
+                    espResult.AddRange(data.Select(d => new DowntimeByWellsValueModel
+                    {
+                        Id = d.Id.ToString(),
+                        Value = (float)d.Value,
+                        Date = d.Date
+                    }));
+                }
+                else if (appId == applicationGL)
+                {
+                    // Fetch data for GL
+                    var data = await _getDataHistoryItemsService.GetDowntimeAsync(downtimeFilters, startDate.ToString(), endDate.ToString());
+
+                    glResult.AddRange(data.Select(d => new DowntimeByWellsValueModel
+                    {
+                        Id = d.Id.ToString(),
+                        Value = (float)d.Value,
+                        Date = d.Date
+                    }));
+                }
+            }
+
+            // Combine results into the final model
+            return new DowntimeByWellsModel
+            {
+                RodPump = rodPumpResult,
+                ESP = espResult,
+                GL = glResult
+            };
         }
 
         /// <summary>
@@ -310,106 +501,125 @@ namespace Theta.XSPOC.Apex.Api.Data.Mongo
         /// <param name="nodeId">The node id.</param>
         /// <param name="correlationId">The correlation id.</param>
         /// <returns>The <seealso cref="IList{MeasurementTrendItemModel}"/>.</returns>
-        public async Task<IList<MeasurementTrendItemModel>> GetMeasurementTrendItems(string nodeId, string correlationId)
+        public IList<MeasurementTrendItemModel> GetMeasurementTrendItems(string nodeId, string correlationId)
         {
-            var parametersCollection = _database.GetCollection<Parameters>("Parameters");
-            var assetsCollection = _database.GetCollection<MongoAssetCollection>("Asset");
+            throw new NotImplementedException();
+            //var parametersCollection = _database.GetCollection<Parameters>("Parameters");
+            //var assetsCollection = _database.GetCollection<MongoAssetCollection>("Asset");
+            //var lookupTypeCollection = _database.GetCollection<LookupTypes>("LookupType");
 
-            // Fetch asset data
-            var assetData = await assetsCollection.Find(x => x.LegacyId["NodeId"] == nodeId).FirstOrDefaultAsync();
-            if (assetData == null)
-            {
-                return Enumerable.Empty<MeasurementTrendItemModel>().ToList();
-            }
+            //// Fetch asset data
+            //var assetData = assetsCollection.Find(x => x.LegacyId["NodeId"] == nodeId).FirstOrDefault();
+            //if (assetData == null)
+            //{
+            //    return Enumerable.Empty<MeasurementTrendItemModel>().ToList();
+            //}
 
-            string pocType = assetData.POCType.LegacyId["POCTypesId"];
+            //string poctype = assetData.POCType.LegacyId["POCTypesId"];
+            //Guid assetGUID = Guid.TryParse(assetData.LegacyId["AssetGUID"], out var parsedGuid) ? parsedGuid : Guid.Empty;
 
-            // Filter for facility tags
-            var facilityTagFilter = Builders<Parameters>.Filter.And(
-                Builders<Parameters>.Filter.Eq(p => p.ParameterType, "Facility"),
-                Builders<Parameters>.Filter.Eq(p => p.Enabled, true),
-                Builders<Parameters>.Filter.Eq(p => p.LegacyId["NodeId"], nodeId),
-                Builders<Parameters>.Filter.Ne(p => p.ParamStandardType, null)
-            );
+            //if (assetGUID == Guid.Empty)
+            //{
+            //    return Enumerable.Empty<MeasurementTrendItemModel>().ToList();
+            //}
 
-            var facilityTags = await parametersCollection.Find(facilityTagFilter).ToListAsync();
-            var facilityTagAddresses = facilityTags.Select(ft => ft.Address).ToList();
-            bool facilityTagsExist = facilityTagAddresses.Any();
+            //// Filter for parameters
+            //var parameterFilter = Builders<Parameters>.Filter.And(
+            //    Builders<Parameters>.Filter.Eq(p => p.LegacyId["NodeId"], nodeId),
+            //    Builders<Parameters>.Filter.Or(
+            //        Builders<Parameters>.Filter.Eq(p => p.LegacyId["POCType"], poctype),
+            //        Builders<Parameters>.Filter.Eq(p => p.LegacyId["POCType"], "99")
+            //    ),
+            //    Builders<Parameters>.Filter.Ne(p => p.ParamStandardType, null)
+            //);
 
-            // Filter for parameters
-            var parameterFilter = Builders<Parameters>.Filter.And(
-                Builders<Parameters>.Filter.Ne(p => p.ParamStandardType, null),
-                Builders<Parameters>.Filter.Or(
-                    Builders<Parameters>.Filter.Eq(p => p.LegacyId["POCType"], pocType),
-                    Builders<Parameters>.Filter.Eq(p => p.LegacyId["POCType"], "99"),
-                    Builders<Parameters>.Filter.And(
-                        Builders<Parameters>.Filter.Eq(p => p.LegacyId["POCType"], "8"),
-                        Builders<Parameters>.Filter.Where(p => p.LegacyId["POCType"] == "17")
-                    )
-                )
-            );
+            //var parameters = parametersCollection.Find(parameterFilter).ToList();
 
-            var parameters = await parametersCollection.Find(parameterFilter).ToListAsync();
+            //var parameterItems = parameters.Select(p => new MeasurementTrendItemModel
+            //{
+            //    ParamStandardType = int.TryParse(p.ParamStandardType?.LegacyId["ParamStandardTypesId"], out var paramStandardType) ? paramStandardType : null,
+            //    Address = p.Address,
+            //    Description = p.Description,
+            //    PhraseID = (p.ParameterDocument as ParameterDetails)?.PhraseId,
+            //    ParameterType = p.LegacyId["POCType"] == "99" ? "1" : "2"
+            //}).ToList();
 
-            // Map parameters and facility tags to MeasurementTrendItemModel
-            var parameterItems = parameters.Select(p => new MeasurementTrendItemModel
-            {
-                ParamStandardType = p.ParamStandardType?.LegacyId["ParamStandardTypesId"] != null
-                                    ? int.Parse(p.ParamStandardType.LegacyId["ParamStandardTypesId"])
-                                    : null,
-                Address = p.Address,
-                Description = p.Description,
-                PhraseID = (p.ParameterDocument as ParameterDetails)?.PhraseId,
-                ParameterType = p.LegacyId["POCType"] == "99" ? "1" : "2"
-            }).ToList();
+            //// Filter for facility tags
+            //var facilityTagFilter = Builders<Parameters>.Filter.And(
+            //    Builders<Parameters>.Filter.Eq(p => p.ParameterType, "Facility"),
+            //    Builders<Parameters>.Filter.Eq(p => p.Enabled, true),
+            //    Builders<Parameters>.Filter.Eq(p => p.LegacyId["NodeId"], nodeId),
+            //    Builders<Parameters>.Filter.Ne(p => p.ParamStandardType, null)
+            //);
 
-            var facilityTagItems = facilityTags.Select(ft => new MeasurementTrendItemModel
-            {
-                ParamStandardType = ft.ParamStandardType?.LegacyId["ParamStandardTypesId"] != null
-                                    ? int.Parse(ft.ParamStandardType.LegacyId["ParamStandardTypesId"])
-                                    : null,
-                Address = ft.Address,
-                Description = ft.Description,
-                PhraseID = null,
-                ParameterType = "2"
-            }).ToList();
+            //var facilityTags = parametersCollection.Find(facilityTagFilter).ToList();
+            //var facilityTagItems = facilityTags.Select(ft => new MeasurementTrendItemModel
+            //{
+            //    ParamStandardType = int.TryParse(ft.ParamStandardType?.LegacyId["ParamStandardTypesId"], out var paramStandardType) ? paramStandardType : null,
+            //    Address = ft.Address,
+            //    Description = ft.Description,
+            //    PhraseID = null,
+            //    ParameterType = "2"
+            //}).ToList();
 
-            // Combine parameters and facility tags
-            var combinedItems = parameterItems.Concat(facilityTagItems).ToList();
+            //// Combine parameters and facility tags
+            //var combinedItems = parameterItems.Concat(facilityTagItems).ToList();
 
-            // Fetch ParamStandardTypes for additional details
-            var paramStandardTypesCollection = _database.GetCollection<ParamStandardTypes>("ParamStandardTypes");
-            var paramStandardTypes = await paramStandardTypesCollection.Find(Builders<ParamStandardTypes>.Filter.Empty).ToListAsync();
+            //// Fetch data history using GetDataHistoryItems service
+            //var dataHistories = _getDataHistoryItemsService.GetDataHistoryItems(
+            //    assetGUID,
+            //    Guid.Empty,
+            //    poctype,
+            //    combinedItems.Select(item => item.Address.ToString()).ToList(),
+            //    null,
+            //    null,
+            //    null
+            //).Result;
 
-            // Join combined items with ParamStandardTypes
-            var resultData = (from item in combinedItems
-                              join pst in paramStandardTypes on item.ParamStandardType equals pst.ParamStandardType
-                              select new MeasurementTrendItemModel
-                              {
-                                  ParamStandardType = pst.ParamStandardType,
-                                  Name = pst.Description,
-                                  UnitTypeID = pst.UnitTypeId,
-                                  Address = item.Address,
-                                  Description = item.Description
-                              }).ToList();
+            //// Fetch LookupType data for ParamStandardType and LocalePhrase
+            //var lookupFilter = Builders<Lookup>.Filter.In(lt => lt, new[] { (int)LookupTypes.ParamStandardTypes, (int)LookupTypes.LocalePhrases });
+            //var lookupTypes = lookupTypeCollection.Find(lookupFilter).ToList();
 
-            // Group and order the result
-            var measurementTrendItems = resultData.GroupBy(d => d.ParamStandardType)
-                .SelectMany(g => g.Select((item, index) => new MeasurementTrendItemModel
-                {
-                    Name = item.Name,
-                    ParamStandardType = item.ParamStandardType,
-                    UnitTypeID = item.UnitTypeID,
-                    Address = item.Address,
-                    Description = item.Description
-                }))
-                .Distinct()
-                .OrderBy(x => x.Name)
-                .ThenBy(x => x.ParamStandardType)
-                .ThenBy(x => x.Address)
-                .ToList();
+            //// Filter combined items by data history addresses
+            //var dataHistoryAddresses = dataHistories.Select(dh => int.TryParse(dh.ChannelId, out var address) ? address : 0).Distinct().ToList();
+            //// Ensure Address is not null before checking if it exists in dataHistoryAddresses
+            //var filteredItems = combinedItems
+            //    .Where(item => item.Address.HasValue && dataHistoryAddresses.Contains(item.Address.Value))
+            //    .ToList();
 
-            return measurementTrendItems;
+            //// Perform joins with LookupType for ParamStandardType and LocalePhrase
+            //var resultData = (from p in filteredItems
+            //                  join ltParam in lookupTypes.Where(lt => (int)lt == (int)LookupTypes.ParamStandardTypes) on p.ParamStandardType equals ltParam into paramStandardJoin
+            //                  from paramStandard in paramStandardJoin.DefaultIfEmpty()
+            //                  join ltPhrase in lookupTypes.Where(lt => (int)lt == (int)LookupTypes.LocalePhrases) on p.PhraseID equals ltPhrase into phraseJoin
+            //                  from localePhrase in phraseJoin.DefaultIfEmpty()
+            //                  select new MeasurementTrendItemModel
+            //                  {
+            //                      ParamStandardType = paramStandard?.Id,
+            //                      Name = paramStandard?.Description ?? localePhrase?.Description,
+            //                      UnitTypeID = paramStandard?.UnitTypeId,
+            //                      Address = p.Address,
+            //                      Description = p.Description ?? localePhrase?.Description
+            //                  }).ToList();
+
+            //// Group and order the results
+            //var groupedItems = resultData
+            //    .GroupBy(item => item.ParamStandardType)
+            //    .SelectMany(group => group.Select((item, index) => new MeasurementTrendItemModel
+            //    {
+            //        Name = item.Name,
+            //        ParamStandardType = item.ParamStandardType,
+            //        UnitTypeID = item.UnitTypeID,
+            //        Address = item.Address,
+            //        Description = item.Description
+            //    }))
+            //    .DistinctBy(x => x.ParamStandardType)
+            //    .OrderBy(x => x.Name)
+            //    .ThenBy(x => x.ParamStandardType)
+            //    .ThenBy(x => x.Address)
+            //    .ToList();
+
+            //return groupedItems;
         }
 
         private float? ConvertToFloat(object value)
