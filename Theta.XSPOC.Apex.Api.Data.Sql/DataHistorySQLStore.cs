@@ -2174,7 +2174,6 @@ private IList<ControllerTrendItemModel> GetControllerTrendItemsUsingSQL(string n
 
                 return Task.FromResult(result);
             }
-
         }
         #endregion
     }

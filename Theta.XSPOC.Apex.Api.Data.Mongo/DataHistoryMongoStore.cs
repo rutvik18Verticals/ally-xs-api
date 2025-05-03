@@ -253,7 +253,6 @@ namespace Theta.XSPOC.Apex.Api.Data.Mongo
             new[] { pstRunTime.ToString(), pstIdleTime.ToString(), pstCycles.ToString(), pstFrequency.ToString(), pstGasInjectionRate.ToString() }),
         Builders<Parameters>.Filter.In(p => p.Address, new[] { pstRunTime, pstIdleTime, pstCycles, pstFrequency, pstGasInjectionRate }) // Add Address filter
     );
-
             var parameters = await parametersCollection.Find(parameterFilter).ToListAsync();
 
             if (!parameters.Any())
