@@ -248,12 +248,11 @@ namespace Theta.XSPOC.Apex.Api.Data.Mongo
 
             // Fetch parameters for the given node IDs
             var parameterFilter = Builders<Parameters>.Filter.And(
-                Builders<Parameters>.Filter.In(p => p.LegacyId["NodeId"], nodeIds),
-                Builders<Parameters>.Filter.Eq(p => p.Enabled, true),
-                Builders<Parameters>.Filter.In(p => p.ParamStandardType.LegacyId["ParamStandardTypesId"],
-                    new[] { pstRunTime.ToString(), pstIdleTime.ToString(), pstCycles.ToString(), pstFrequency.ToString(), pstGasInjectionRate.ToString() })
-            );
-
+        Builders<Parameters>.Filter.Eq(p => p.Enabled, true),
+        Builders<Parameters>.Filter.In(p => p.ParamStandardType.LegacyId["ParamStandardTypesId"],
+            new[] { pstRunTime.ToString(), pstIdleTime.ToString(), pstCycles.ToString(), pstFrequency.ToString(), pstGasInjectionRate.ToString() }),
+        Builders<Parameters>.Filter.In(p => p.Address, new[] { pstRunTime, pstIdleTime, pstCycles, pstFrequency, pstGasInjectionRate }) // Add Address filter
+    );
             var parameters = await parametersCollection.Find(parameterFilter).ToListAsync();
 
             if (!parameters.Any())
@@ -333,10 +332,7 @@ namespace Theta.XSPOC.Apex.Api.Data.Mongo
 
                 if (appId == applicationRodPump)
                 {
-                    // Fetch data for Rod Pump
-                    var data = await _getDataHistoryItemsService.GetDowntimeAsync(downtimeFilters, startDate.ToString(), endDate.ToString());
-
-                    var grouped = data.GroupBy(x => new { x.Id, x.Date });
+                    var grouped = downtimeData.GroupBy(x => new { x.Id, x.Date });
 
                     foreach (var g in grouped)
                     {
@@ -359,10 +355,7 @@ namespace Theta.XSPOC.Apex.Api.Data.Mongo
                 }
                 else if (appId == applicationESP)
                 {
-                    // Fetch data for ESP
-                    var data = await _getDataHistoryItemsService.GetDowntimeAsync(downtimeFilters, startDate.ToString(), endDate.ToString());
-
-                    espResult.AddRange(data.Select(d => new DowntimeByWellsValueModel
+                    espResult.AddRange(downtimeData.Select(d => new DowntimeByWellsValueModel
                     {
                         Id = d.Id.ToString(),
                         Value = (float)d.Value,
@@ -371,10 +364,7 @@ namespace Theta.XSPOC.Apex.Api.Data.Mongo
                 }
                 else if (appId == applicationGL)
                 {
-                    // Fetch data for GL
-                    var data = await _getDataHistoryItemsService.GetDowntimeAsync(downtimeFilters, startDate.ToString(), endDate.ToString());
-
-                    glResult.AddRange(data.Select(d => new DowntimeByWellsValueModel
+                    glResult.AddRange(downtimeData.Select(d => new DowntimeByWellsValueModel
                     {
                         Id = d.Id.ToString(),
                         Value = (float)d.Value,
