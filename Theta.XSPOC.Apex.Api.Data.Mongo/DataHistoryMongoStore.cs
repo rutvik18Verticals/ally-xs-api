@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Theta.XSPOC.Apex.Api.Data.Entity.EntitySetup;
 using Theta.XSPOC.Apex.Api.Data.Influx.Services;
 using Theta.XSPOC.Apex.Api.Data.Models;
 using Theta.XSPOC.Apex.Api.Data.Models.MongoCollection.Customers;
