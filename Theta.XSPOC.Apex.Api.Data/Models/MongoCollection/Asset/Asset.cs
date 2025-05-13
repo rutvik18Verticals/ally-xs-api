@@ -73,5 +73,20 @@ namespace Theta.XSPOC.Apex.Api.Data.Models.MongoCollection.Asset
         /// </summary>
         public AssetDetailBase AssetDetails { get; set; }
 
+        /// <summary>
+        /// Gets or sets the field.
+        /// </summary>
+        public string Field { get; set; }
+
+        /// <summary>
+        /// Gets or sets the area.
+        /// </summary>
+        public string Area { get; set; }
+
+        /// <summary>
+        /// Gets or sets the business unit.
+        /// </summary>
+        public string BusinessUnit { get; set; }
+
     }
 }

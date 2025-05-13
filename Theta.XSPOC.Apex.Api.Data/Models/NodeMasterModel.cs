@@ -318,5 +318,35 @@ namespace Theta.XSPOC.Apex.Api.Data.Models
         /// </summary>
         public string UserAccount { get; set; }
 
+        /// <summary>
+        /// Gets or sets the MethodofProduction.
+        /// </summary>
+        public string MethodofProduction { get; set; }
+
+        /// <summary>
+        /// Gets or sets the field.
+        /// </summary>
+        public string Field { get; set; }
+
+        /// <summary>
+        /// Gets or sets the area.
+        /// </summary>
+        public string Area { get; set; }
+
+        /// <summary>
+        /// Gets or sets the business unit.
+        /// </summary>
+        public string BusinessUnit { get; set; }
+
+        /// <summary>
+        /// Gets or sets the TimeZone Id.
+        /// </summary>
+        public string TimeZoneId { get; set; }
+
+        /// <summary>
+        /// Gets or sets the business unit.
+        /// </summary>
+        public double TimeZoneOffset { get; set; }
+
     }
 }

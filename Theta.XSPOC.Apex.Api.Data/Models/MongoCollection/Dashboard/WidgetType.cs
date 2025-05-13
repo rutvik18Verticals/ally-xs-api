@@ -5,7 +5,7 @@ namespace Theta.XSPOC.Apex.Api.Data.Models.MongoCollection.Dashboard
     /// <summary>
     /// This is a base class for the lookup sub document.
     /// </summary>
-    [BsonKnownTypes(typeof(WellTest), typeof(TimeSeriesChart))]
+    [BsonKnownTypes(typeof(WellTest), typeof(TimeSeriesChart), typeof(TaskDetail))]
     public class WidgetType
     {
     }

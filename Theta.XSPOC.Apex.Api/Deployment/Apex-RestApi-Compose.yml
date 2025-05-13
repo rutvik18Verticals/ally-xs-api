@@ -57,6 +57,7 @@ services:
       - "AppSettings:LoginURL={{LoginURL}}"
       - "AppSettings:HostingEnvironment={{HostingEnvironment}}"
       - "AppSettings:LoginMode={{LoginMode}}"
+      - "EnableInflux={{EnableInflux}}"
     ports:
       - mode: host
         published: 3010

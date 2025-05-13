@@ -1,8 +1,11 @@
+using MongoDB.Bson.Serialization.Attributes;
+
 namespace Theta.XSPOC.Apex.Api.Data.Models.MongoCollection
 {
     /// <summary>
     /// This is a record that represents the param standard data.
     /// </summary>
+    [BsonIgnoreExtraElements]
     public class DefaultParameters : DocumentBase
     {
 
@@ -40,6 +43,11 @@ namespace Theta.XSPOC.Apex.Api.Data.Models.MongoCollection
         /// Gets or sets the Low Param Type.
         /// </summary>
         public string LowParamType { get; set; }
+
+        /// <summary>
+        /// Gets or sets the flag for selected or not
+        /// </summary>
+        public bool Selected { get; set; }
 
     }
 }

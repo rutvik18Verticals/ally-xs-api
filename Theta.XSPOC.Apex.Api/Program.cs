@@ -491,6 +491,7 @@ namespace Theta.XSPOC.Apex.Api
                 services.AddSingleton<IAlarmStore, AlarmSQLStore>();
             }
 
+            services.AddSingleton<IAlarmInfluxStore, AlarmInfluxStore>();
             services.AddSingleton<IUnitConversion, UnitConversion>();
             services.AddSingleton<ISystemSettingStore, SystemSettingStore>();
             services.AddSingleton<IAssetStatusService, AssetStatusService>();

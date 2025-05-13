@@ -86,6 +86,12 @@ namespace Theta.XSPOC.Apex.Api.Core.Logging
         public static LoggingModel APIService { get; } = CreateValue(13, Loggers.APIService, "APIServiceLogVerbosity",
             AppName);
 
+        /// <summary>
+        /// Gets the group and asset logging model.
+        /// </summary>
+        public static LoggingModel DashboardWidget { get; } = CreateValue(14, Loggers.DashboardWidget, "DashboardWidgetLogVerbosity",
+            AppName);
+
         #endregion
 
         #region Constructors

@@ -24,44 +24,64 @@ namespace Theta.XSPOC.Apex.Api.Core.Models.Inputs
         public string POCType { get; set; }
 
         /// <summary>
-        /// Gets or sets the chart 1 tree node type id.
+        /// Gets or sets the chart 1 tree node trend type ids.
         /// </summary>
-        public string Chart1Type { get; set; }
+        public string Chart1TrendTypes { get; set; }
 
         /// <summary>
-        /// Gets or sets the chart 1 item id.
+        /// Gets or sets the chart 1 trend names.
         /// </summary>
-        public string Chart1ItemId { get; set; }
+        public string Chart1TrendNames { get; set; }
 
         /// <summary>
-        /// Gets or sets the chart 2 tree node type id.
+        /// Gets or sets the chart 1 trend addresses.
         /// </summary>
-        public string Chart2Type { get; set; }
+        public string Chart1TrendAddresses { get; set; }
 
         /// <summary>
-        /// Gets or sets the chart 2 item id.
+        /// Gets or sets the chart 2 tree node trend type ids.
         /// </summary>
-        public string Chart2ItemId { get; set; }
+        public string Chart2TrendTypes { get; set; }
 
         /// <summary>
-        /// Gets or sets the chart 3 tree node type id.
+        /// Gets or sets the chart 2 trend names.
         /// </summary>
-        public string Chart3Type { get; set; }
+        public string Chart2TrendNames { get; set; }
 
         /// <summary>
-        /// Gets or sets the chart 3 item id.
+        /// Gets or sets the chart 2 trend addresses.
         /// </summary>
-        public string Chart3ItemId { get; set; }
+        public string Chart2TrendAddresses { get; set; }
 
         /// <summary>
-        /// Gets or sets the chart 4 tree node type id.
+        /// Gets or sets the chart 3 tree node trend type ids.
         /// </summary>
-        public string Chart4Type { get; set; }
+        public string Chart3TrendTypes { get; set; }
 
         /// <summary>
-        /// Gets or sets the chart 4 item id.
+        /// Gets or sets the chart 3 trend names.
         /// </summary>
-        public string Chart4ItemId { get; set; }
+        public string Chart3TrendNames { get; set; }
+
+        /// <summary>
+        /// Gets or sets the chart 3 trend addresses.
+        /// </summary>
+        public string Chart3TrendAddresses { get; set; }
+
+        /// <summary>
+        /// Gets or sets the chart 4 tree node trend type ids.
+        /// </summary>
+        public string Chart4TrendTypes { get; set; }
+
+        /// <summary>
+        /// Gets or sets the chart 4 trend names.
+        /// </summary>
+        public string Chart4TrendNames { get; set; }
+
+        /// <summary>
+        /// Gets or sets the chart 4 trend addresses.
+        /// </summary>
+        public string Chart4TrendAddresses { get; set; }
 
         /// <summary>
         /// Gets or sets the start date.

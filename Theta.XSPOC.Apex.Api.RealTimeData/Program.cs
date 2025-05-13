@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
@@ -31,6 +32,7 @@ using Theta.XSPOC.Apex.Kernel.Data.Sql;
 using Theta.XSPOC.Apex.Kernel.DateTimeConversion;
 using Theta.XSPOC.Apex.Kernel.KeyVault;
 using Theta.XSPOC.Apex.Kernel.Logging;
+using System.IO.Compression;
 
 namespace Theta.XSPOC.Apex.Api.RealTimeData
 {
@@ -155,7 +157,22 @@ namespace Theta.XSPOC.Apex.Api.RealTimeData
                 ConfigureServices(hostContext, services);
             });
 
-            var appsettingsConfiguration = builder.Configuration.GetSection("AppSettings");
+            builder.Services.Configure<BrotliCompressionProviderOptions>(options =>
+            {
+                options.Level = CompressionLevel.Fastest;
+            });
+
+            builder.Services.Configure<GzipCompressionProviderOptions>(options =>
+            {
+                options.Level = CompressionLevel.SmallestSize;
+            });
+
+            builder.Services.AddResponseCompression(options =>
+            {
+                options.EnableForHttps = true;
+                options.Providers.Add<BrotliCompressionProvider>();
+                options.Providers.Add<GzipCompressionProvider>();
+            });
 
             var app = builder.Build();
 
@@ -195,6 +212,8 @@ namespace Theta.XSPOC.Apex.Api.RealTimeData
             app.UseAuthentication();
 
             app.UseAuthorization();
+
+            app.UseResponseCompression();
 
             app.MapControllers();
 

@@ -162,44 +162,64 @@ namespace Theta.XSPOC.Apex.Api.Common
             public const string Property = "property";
 
             /// <summary>
-            /// The chart1Type query param key.
+            /// The chart1TrendTypes query param key.
             /// </summary>
-            public const string Chart1Type = "chart1Type";
+            public const string Chart1TrendTypes = "chart1TrendTypes";
 
             /// <summary>
-            /// The chart1ItemId query param key.
+            /// The chart1TrendNames query param key.
             /// </summary>
-            public const string Chart1ItemId = "chart1ItemId";
+            public const string Chart1TrendNames = "chart1TrendNames";
 
             /// <summary>
-            /// The chart2Type query param key.
+            /// The chart1TrendAddresses query param key.
             /// </summary>
-            public const string Chart2Type = "chart2Type";
+            public const string Chart1TrendAddresses = "chart1TrendAddresses";
 
             /// <summary>
-            /// The chart2ItemId query param key.
+            /// The chart2TrendTypes query param key.
             /// </summary>
-            public const string Chart2ItemId = "chart2ItemId";
+            public const string Chart2TrendTypes = "chart2TrendTypes";
 
             /// <summary>
-            /// The chart3Type query param key.
+            /// The chart2TrendNames query param key.
             /// </summary>
-            public const string Chart3Type = "chart3Type";
+            public const string Chart2TrendNames = "chart2TrendNames";
 
             /// <summary>
-            /// The chart3ItemId query param key.
+            /// The chart2TrendAddresses query param key.
             /// </summary>
-            public const string Chart3ItemId = "chart3ItemId";
+            public const string Chart2TrendAddresses = "chart2TrendAddresses";
 
             /// <summary>
-            /// The chart4Type query param key.
+            /// The chart3TrendTypes query param key.
             /// </summary>
-            public const string Chart4Type = "chart4Type";
+            public const string Chart3TrendTypes = "chart3TrendTypes";
 
             /// <summary>
-            /// The chart4ItemId query param key.
+            /// The chart3TrendNames query param key.
             /// </summary>
-            public const string Chart4ItemId = "chart4ItemId";
+            public const string Chart3TrendNames = "chart3TrendNames";
+
+            /// <summary>
+            /// The chart3TrendAddresses query param key.
+            /// </summary>
+            public const string Chart3TrendAddresses = "chart3TrendAddresses";
+
+            /// <summary>
+            /// The chart4TrendTypes query param key.
+            /// </summary>
+            public const string Chart4TrendTypes = "chart4TrendTypes";
+
+            /// <summary>
+            /// The chart4TrendNames query param key.
+            /// </summary>
+            public const string Chart4TrendNames = "chart4TrendNames";
+
+            /// <summary>
+            /// The chart4TrendAddresses query param key.
+            /// </summary>
+            public const string Chart4TrendAddresses = "chart4TrendAddresses";
 
             /// <summary>
             /// The query param key indicating overlay chart or not.

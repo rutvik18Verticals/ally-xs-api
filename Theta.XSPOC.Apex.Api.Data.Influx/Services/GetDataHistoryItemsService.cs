@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Theta.XSPOC.Apex.Api.Data.Models;
+using Theta.XSPOC.Apex.Api.Data.Models.MongoCollection;
+using Theta.XSPOC.Apex.Api.Data.Models.MongoCollection.Parameter;
 
 namespace Theta.XSPOC.Apex.Api.Data.Influx.Services
 {
@@ -118,7 +120,7 @@ namespace Theta.XSPOC.Apex.Api.Data.Influx.Services
         /// <param name="pageNum">The page number</param>
         /// <param name="pageSize">The page size</param>
         /// <returns>The <seealso cref="IList{DataPointModel}"/></returns>
-        public async Task<IList<DataPointModel>> GetAllyTimeSeriesDataHistoryTrendData(List<Guid> assetIds, Guid customerId, 
+        public async Task<IList<DataPointModel>> GetAllyTimeSeriesDataHistoryTrendData(List<Guid> assetIds, Guid customerId,
            List<string> channelIds, string startDate, string endDate, string downsampleType, string downsampleWindowSize
             , int pageNum, int pageSize)
         {
@@ -144,7 +146,7 @@ namespace Theta.XSPOC.Apex.Api.Data.Influx.Services
         /// <param name="pageSize">The page size</param>
         /// <param name="inputs">Asset details.</param>
         /// <returns>The <seealso cref="IList{DataPointModel}"/></returns>
-        public async Task<IList<TimeSeriesData>> GetTimeSeriesResponseAsync (List<Guid> assetIds, Guid customerId,
+        public async Task<IList<TimeSeriesData>> GetTimeSeriesResponseAsync(List<Guid> assetIds, Guid customerId,
            List<string> channelIds, string startDate, string endDate, string downsampleType, string downsampleWindowSize
             , int pageNum, int pageSize, List<TimeSeriesInputModel> inputs)
         {
@@ -178,6 +180,56 @@ namespace Theta.XSPOC.Apex.Api.Data.Influx.Services
         public async Task<IList<CurrentRawScanDataInfluxModel>> GetCurrentRawScanData(Guid assetId)
         {
             var data = await _influxDataStore.GetCurrentRawScanData(assetId);
+
+            return data ?? null;
+        }
+        /// <summary>
+        /// Gets the graph data from InfluxDB stores based on the provided filters used below.
+        /// </summary>
+        /// <param name="assetId"></param>
+        /// <param name="wellName"></param>
+        /// <param name="startDate"></param>
+        /// <param name="endDate"></param>
+        /// <param name="pocType"></param>
+        /// <param name="parameters"></param>
+        /// <param name="channelIds"></param>
+        /// <param name="listOfTrends"></param>
+        /// <param name="aggregate"></param>
+        /// <param name="aggregateMethod"></param>
+        /// <param name="nodeTimeZoneOffset"></param>
+        /// <param name="honorDaylighSaving"></param>
+        /// <returns></returns>
+        public async Task<IList<DataPointsModelDto>> GetInfluxDataAssetTrends(Guid assetId, string wellName, DateTime startDate, DateTime endDate, int pocType, List<Parameters> parameters, List<string> channelIds, List<DefaultParameters> listOfTrends, string aggregate, string aggregateMethod, float nodeTimeZoneOffset, bool honorDaylighSaving)
+        {
+            var data = await _influxDataStore.GetInfluxDataAssetTrends(assetId, wellName, startDate, endDate, pocType, parameters, channelIds, listOfTrends, aggregate, aggregateMethod, nodeTimeZoneOffset, honorDaylighSaving);
+
+            return data ?? null;
+        }
+
+        /// <summary>
+        /// Gets the downtime data from InfluxDB stores based on the assetId, start date, and end date.
+        /// </summary>
+        /// <param name="assetId">The asset id.</param>
+        /// <param name="startDate">The start date.</param>
+        /// <param name="endDate">The end date.</param>
+        /// <param name="channelId">The Channel Id</param>
+        /// <returns>The influx data for downtime PST in the form of <seealso cref="IList{DataPointModel}"/>.</returns>
+        public async Task<IList<DataPointModel>> GetDowntime(Guid assetId, DateTime startDate, DateTime endDate, string channelId)
+        {
+            var data = await _influxDataStore.GetDowntime(assetId, startDate, endDate, channelId);
+
+            return data ?? null;
+        }
+
+        /// <summary>
+        /// Method to get the Current scan data for the <paramref name="assetId"/>  and <paramref name="customerId"/>
+        /// </summary>
+        /// <param name="assetId">The asset guid.</param>
+        /// <param name="customerId">The customer guid.</param>
+        /// <returns>The <seealso cref="IList{DataPointModel}"/></returns>
+        public async Task<IList<DataPointModel>> GetCurrentRawScanData(Guid assetId, Guid customerId)
+        {
+            var data = await _influxDataStore.GetCurrentRawScanData(assetId, customerId);
 
             return data ?? null;
         }

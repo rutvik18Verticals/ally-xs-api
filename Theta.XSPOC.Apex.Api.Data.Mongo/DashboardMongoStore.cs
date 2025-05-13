@@ -1,4 +1,5 @@
-﻿using MongoDB.Driver;
+﻿using MongoDB.Bson;
+using MongoDB.Driver;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -92,28 +93,7 @@ namespace Theta.XSPOC.Apex.Api.Data.Mongo
 
                 var data = dashboardUserData ?? dashboardData.FirstOrDefault();
 
-                var lstWidgets = isStacked ? data.Widgets.Stacked.Select(x => x.Key).ToArray()
-                    : data.Widgets.Default.Select(x => x.Key).ToArray();
-
-                var filterWidgetProperties = Builders<DashboardWidgets>.Filter.And(
-                        Builders<DashboardWidgets>.Filter.Eq(x => x.Dashboard, dashboardType),
-                        Builders<DashboardWidgets>.Filter.In(x => x.Key, lstWidgets),
-                        Builders<DashboardWidgets>.Filter.Eq(x => x.IsDeleted, false)
-                    );
-
-                var widgetProperty = Find<DashboardWidgets>(DASHBOARDWIDGETS_COLLECTION, filterWidgetProperties, correlationId);
-
-                var filterUserSettings = Builders<DashboardWidgetUserSettings>.Filter.And(
-                        Builders<DashboardWidgetUserSettings>.Filter.Eq(x => x.DashboardName, dashboardType),
-                        Builders<DashboardWidgetUserSettings>.Filter.Eq(x => x.UserId, userId),
-                        Builders<DashboardWidgetUserSettings>.Filter.Eq(x => x.IsDeleted, false)
-                    );
-
-                var userSettings = Find<DashboardWidgetUserSettings>(DASHBOARDWIDGETUSERSETTINGS_COLLECTION,
-                    filterUserSettings, correlationId);
-
-                // Map the dashboard data to DashboardWidgetDataModel
-                return Map(data, widgetProperty, userSettings, isStacked);
+                return GetDashboardData(data, dashboardType, userId, isStacked, correlationId);
             }
 
             return null;
@@ -133,7 +113,45 @@ namespace Theta.XSPOC.Apex.Api.Data.Mongo
                 $" {nameof(SaveDashboardWidgetUserPrefeernces)}", correlationId);
 
             if (input == null)
+            {
                 throw new ArgumentNullException(nameof(input), "User Preferences cannot be null.");
+            }
+
+            var filterDashboardSettings = Builders<Dashboards>.Filter.And(
+                    Builders<Dashboards>.Filter.Eq(x => x.Dashboard, input.DashboardName),
+                    Builders<Dashboards>.Filter.Eq(x => x.UserId, userId)
+                );
+
+            var dashboardData = Find<Dashboards>(DASHBOARD_COLLECTION, filterDashboardSettings, correlationId)?.FirstOrDefault();
+
+            if (dashboardData == null)
+            {
+                var filterdefaultDashboard = Builders<Dashboards>.Filter.And(
+                    Builders<Dashboards>.Filter.Eq(x => x.Dashboard, input.DashboardName),
+                    Builders<Dashboards>.Filter.Eq(x => x.UserId, null)
+                );
+                var defaultDashbaord = Find<Dashboards>(DASHBOARD_COLLECTION, filterdefaultDashboard, correlationId)?.FirstOrDefault();
+                defaultDashbaord.Id = ObjectId.GenerateNewId().ToString();
+                defaultDashbaord.UserId = userId;
+
+                if (input.WidgetName.ToLower() == "timeserieschart")
+                {
+                    defaultDashbaord.Default = ((input.Preferences as TimeSeriesChart)?.ChartType?.ToLower()) != "stacked";
+                }
+                else
+                {
+                    defaultDashbaord.Default = false;
+                }
+                await _database.GetCollection<Dashboards>(DASHBOARD_COLLECTION).InsertOneAsync(defaultDashbaord);
+            }
+            else
+            {
+                if (input.WidgetName.ToLower() == "timeserieschart")
+                {
+                    dashboardData.Default = ((input.Preferences as TimeSeriesChart)?.ChartType?.ToLower()) != "stacked";
+                }
+                await _database.GetCollection<Dashboards>(DASHBOARD_COLLECTION).ReplaceOneAsync(x => x.Id == dashboardData.Id, dashboardData);
+            }
 
             var filterUserSettings = Builders<DashboardWidgetUserSettings>.Filter.And(
                        Builders<DashboardWidgetUserSettings>.Filter.Eq(x => x.DashboardName, input.DashboardName),
@@ -254,17 +272,21 @@ namespace Theta.XSPOC.Apex.Api.Data.Mongo
         /// <param name="userId"></param>
         /// <param name="correlationId"></param>
         /// <returns></returns>
-        public async Task<bool> ResetDashboardWidgetUserPrefeernces(DashboardWidgetPreferenceDataModel input, string userId, string correlationId)
+        public async Task<DashboardWidgetDataModel> ResetDashboardWidgetUserPrefeernces(DashboardWidgetPreferenceDataModel input, string userId, string correlationId)
         {
             var logger = _loggerFactory.Create(LoggingModel.MongoDataStore);
             logger.WriteCId(Level.Trace, $"Starting {nameof(DashboardMongoStore)}" +
                 $" {nameof(ResetDashboardWidgetUserPrefeernces)}", correlationId);
 
             if (input == null)
+            {
                 throw new ArgumentNullException(nameof(input), "User Preferences cannot be null.");
+            }
 
             if (string.IsNullOrWhiteSpace(input.DashboardName) || string.IsNullOrWhiteSpace(input.WidgetName))
+            {
                 throw new ArgumentNullException(nameof(input), "Invalid dashboard or widget name, name cannot be empty.");
+            }
 
             var filterUserSettings = Builders<DashboardWidgetUserSettings>.Filter.And(
                        Builders<DashboardWidgetUserSettings>.Filter.Eq(x => x.DashboardName, input.DashboardName),
@@ -285,13 +307,61 @@ namespace Theta.XSPOC.Apex.Api.Data.Mongo
 
                 logger.WriteCId(Level.Trace, $"Finished {nameof(DashboardMongoStore)} {nameof(ResetDashboardWidgetUserPrefeernces)}", correlationId);
 
-                return true;
+                bool isStacked = false;
+
+                var filter = Builders<Dashboards>.Filter.And(
+                   Builders<Dashboards>.Filter.Eq(x => x.Dashboard, input.DashboardName));
+
+                var dashboardData = Find<Dashboards>(DASHBOARD_COLLECTION, filter, correlationId);
+
+                if (dashboardData != null && dashboardData.Count > 0)
+                {
+                    var dashboardUserData = dashboardData.Where(x => x.UserId == userId)?.FirstOrDefault();
+                    if (dashboardUserData == null)
+                    {
+                        logger.WriteCId(Level.Info, "Missing dashboard user data", correlationId);
+                    }
+
+                    var data = dashboardUserData ?? dashboardData.FirstOrDefault();
+
+                    isStacked = (bool)!data?.Default;
+
+                    return await GetDashboardData(data, input.DashboardName, userId, isStacked, correlationId);
+                }
             }
-            return true;
+
+            return null;
         }
+
         #endregion
 
         #region Private Methods
+
+        private Task<DashboardWidgetDataModel> GetDashboardData(Dashboards data, string dashboardType, string userId, bool isStacked, string correlationId)
+        {
+            var lstWidgets = isStacked ? data.Widgets.Stacked.Select(x => x.Key).ToArray()
+                    : data.Widgets.Default.Select(x => x.Key).ToArray();
+
+            var filterWidgetProperties = Builders<DashboardWidgets>.Filter.And(
+                    Builders<DashboardWidgets>.Filter.Eq(x => x.Dashboard, dashboardType),
+                    Builders<DashboardWidgets>.Filter.In(x => x.Key, lstWidgets),
+                    Builders<DashboardWidgets>.Filter.Eq(x => x.IsDeleted, false)
+                );
+
+            var widgetProperty = Find<DashboardWidgets>(DASHBOARDWIDGETS_COLLECTION, filterWidgetProperties, correlationId);
+
+            var filterUserSettings = Builders<DashboardWidgetUserSettings>.Filter.And(
+                    Builders<DashboardWidgetUserSettings>.Filter.Eq(x => x.DashboardName, dashboardType),
+                    Builders<DashboardWidgetUserSettings>.Filter.Eq(x => x.UserId, userId),
+                    Builders<DashboardWidgetUserSettings>.Filter.Eq(x => x.IsDeleted, false)
+                );
+
+            var userSettings = Find<DashboardWidgetUserSettings>(DASHBOARDWIDGETUSERSETTINGS_COLLECTION,
+                filterUserSettings, correlationId);
+
+            // Map the dashboard data to DashboardWidgetDataModel
+            return Map(data, widgetProperty, userSettings, isStacked);
+        }
 
         /// <summary>
         /// Maps a Dashboard entity to a <seealso cref="DashboardWidgetDataModel"/>.
@@ -390,6 +460,7 @@ namespace Theta.XSPOC.Apex.Api.Data.Mongo
             var widget = widgetProperties.FirstOrDefault();
             var userSetting = userSettings?.FirstOrDefault();
             object widgetProperty;
+            bool isDefaultProperty = false;
             if (widget.Key == "wellTestTable")
             {
                 WellTest wellTestProperty;
@@ -398,17 +469,38 @@ namespace Theta.XSPOC.Apex.Api.Data.Mongo
                     wellTestProperty = (WellTest)userSetting.PropertyValue;
                     wellTestProperty.Columns = wellTestProperty.Columns.OrderBy(x => x.Order).ToList();
                     widgetProperty = wellTestProperty;
+                    isDefaultProperty = false;
                 }
                 else
                 {
                     wellTestProperty = (WellTest)widget.WidgetProperties;
                     wellTestProperty.Columns = wellTestProperty.Columns.OrderBy(x => x.Order).ToList();
                     widgetProperty = wellTestProperty;
+                    isDefaultProperty = true;
+                }
+            }
+            else if (widget.Key == "taskDetails")
+            {
+                TaskDetail wellTaskProperty;
+                if (userSetting != null)
+                {
+                    wellTaskProperty = (TaskDetail)userSetting.PropertyValue;
+                    wellTaskProperty.Columns = wellTaskProperty.Columns.OrderBy(x => x.Order).ToList();
+                    widgetProperty = wellTaskProperty;
+                    isDefaultProperty = false;
+                }
+                else
+                {
+                    wellTaskProperty = (TaskDetail)widget.WidgetProperties;
+                    wellTaskProperty.Columns = wellTaskProperty.Columns.OrderBy(x => x.Order).ToList();
+                    widgetProperty = wellTaskProperty;
+                    isDefaultProperty = true;
                 }
             }
             else
             {
                 widgetProperty = userSetting != null ? userSetting.PropertyValue : widget.WidgetProperties;
+                isDefaultProperty = userSetting == null;
             }
 
             return new WidgetPropertyDataModel
@@ -421,7 +513,8 @@ namespace Theta.XSPOC.Apex.Api.Data.Mongo
                 ExternalUri = widget.ExternalUri,
                 HttpMethod = widget.HttpMethod,
                 HttpBody = widget.HttpBody,
-                WidgetProperties = widgetProperty
+                WidgetProperties = widgetProperty,
+                IsDefault = isDefaultProperty
             };
         }
 

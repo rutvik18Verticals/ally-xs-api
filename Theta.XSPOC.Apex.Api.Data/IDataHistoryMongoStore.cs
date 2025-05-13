@@ -3,7 +3,8 @@ using System.Collections.Generic;
 using System;
 using Theta.XSPOC.Apex.Api.Data.Models;
 using System.Threading.Tasks;
-
+using MongoAssetCollection = Theta.XSPOC.Apex.Api.Data.Models.MongoCollection.Asset;
+using MongoParameters = Theta.XSPOC.Apex.Kernel.Mongo.Models.Parameter.Parameters;
 namespace Theta.XSPOC.Apex.Api.Data
 {
     /// <summary>
@@ -20,16 +21,15 @@ namespace Theta.XSPOC.Apex.Api.Data
         /// <param name="startDate"></param>
         /// <param name="endDate"></param>
         /// <returns>The <seealso cref="IList{MeasurementTrendDataModel}"/>.</returns>
-        Task<IList<MeasurementTrendDataModel>> GetMeasurementTrendData(string nodeId,
+        Task<IList<DataPointModel>> GetMeasurementTrendData(string nodeId,
             int paramStandardType, DateTime startDate, DateTime endDate, string correlationId);
 
         /// <summary>
         /// Gets the <seealso cref="IList{MeasurementTrendDataModel}"/>.
         /// </summary>
         /// <param name="nodeId">The node id.</param>
-        /// <param name="correlationId"></param>
         /// <returns>The <seealso cref="IList{MeasurementTrendDataModel}"/>.</returns>
-        IList<MeasurementTrendItemModel> GetMeasurementTrendItems(string nodeId, string correlationId);
+        Task<IList<DataPointModel>> GetMeasurementTrendItems(string nodeId);
 
         /// <summary>
         /// Get the controller trend item by node id and poc type.
@@ -38,7 +38,7 @@ namespace Theta.XSPOC.Apex.Api.Data
         /// <param name="pocType">The poc type.</param>
         /// <param name="correlationId"></param>
         /// <returns>The <seealso cref="ControllerTrendItemModel"/>.</returns>
-        IList<ControllerTrendItemModel> GetControllerTrendItems(string nodeId, int pocType, string correlationId);
+        Task<IList<DataPointModel>> GetControllerTrendItems(string nodeId, int pocType, string correlationId);
 
         /// <summary>
         /// Gets the <seealso cref="IList{ControllerTrendDataModel}"/>.
@@ -49,7 +49,7 @@ namespace Theta.XSPOC.Apex.Api.Data
         /// <param name="endDate">The end date.</param>
         /// <param name="correlationId"></param>
         /// <returns>The <seealso cref="IList{ControllerTrendDataModel}"/>.</returns>
-        IList<ControllerTrendDataModel> GetControllerTrendData(string nodeId,
+        Task<IList<ControllerTrendDataModel>> GetControllerTrendData(string nodeId,
             int address, DateTime startDate, DateTime endDate, string correlationId);
 
         /// <summary>
@@ -59,6 +59,32 @@ namespace Theta.XSPOC.Apex.Api.Data
         /// <param name="numberOfDays">The number of days.</param>
         /// <param name="correlationId"></param>
         /// <returns>The <see cref="DowntimeByWellsModel"/>.</returns>
-        DowntimeByWellsModel GetDowntime(IList<string> nodeIds, int numberOfDays, string correlationId);
+        Task<DowntimeByWellsModel> GetDowntime(IList<string> nodeIds, int numberOfDays, string correlationId);
+
+        /// <summary>
+        /// Get Asset Mongo Collection.
+        /// </summary>
+        /// <param name="nodeId"></param>
+        /// <returns></returns>
+        public Task<MongoAssetCollection.Asset> GetAssetAsync(string nodeId);
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="channelIds"></param>
+        /// <param name="nodeId"></param>
+        /// <param name="correlationId"></param>
+        /// <returns></returns>
+        public Task<IDictionary<(int Address, string ChannelId), MongoParameters>> GetParametersBulk(List<string> channelIds, string nodeId, string correlationId);
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="channelIds"></param>
+        /// <param name="pocType"></param>
+        /// <param name="correlationId"></param>
+        /// <returns></returns>
+        public Task<IDictionary<(int Address, string ChannelId), MongoParameters>> GetParametersBulk(List<string> channelIds, int pocType, string correlationId);
+        
     }
 }

@@ -1,6 +1,4 @@
-﻿
-
-using Theta.XSPOC.Apex.Api.Data.Models.MongoCollection.Dashboard;
+﻿using Theta.XSPOC.Apex.Api.Data.Models.MongoCollection.Dashboard;
 
 namespace Theta.XSPOC.Apex.Api.Data.Models.Dashboard
 {

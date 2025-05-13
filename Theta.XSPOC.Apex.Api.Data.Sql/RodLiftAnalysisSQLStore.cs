@@ -1,14 +1,17 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using Theta.XSPOC.Apex.Api.Data.Entity;
+using Theta.XSPOC.Apex.Api.Data.Influx.Services;
 using Theta.XSPOC.Apex.Api.Data.Models;
 using Theta.XSPOC.Apex.Api.Data.Sql.Logging;
 using Theta.XSPOC.Apex.Kernel.Data.Sql.Entity;
 using Theta.XSPOC.Apex.Kernel.DateTimeConversion;
 using Theta.XSPOC.Apex.Kernel.Logging;
 using Theta.XSPOC.Apex.Kernel.Logging.Models;
+using ParameterMongo = Theta.XSPOC.Apex.Api.Data.Models.MongoCollection.Parameter;
 
 namespace Theta.XSPOC.Apex.Api.Data.Sql
 {
@@ -24,6 +27,9 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql
         private const string UPLIFT_OPP_MINIMUM_PRODUCTION_THRESHOLD = "UpliftOppMinimumProductionThreshold";
         private readonly IThetaLoggerFactory _loggerFactory;
         private readonly IDateTimeConverter _dateTimeConverter;
+        private readonly IConfiguration _config;
+        private readonly IAllyTimeSeriesNodeMaster _allyNodeMasterStore;
+        private readonly IGetDataHistoryItemsService _dataHistoryInfluxStore;
 
         #endregion
 
@@ -39,6 +45,9 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql
         /// <param name="loggerFactory">The factory for creating the logger.</param>
         /// <param name="localePhrases">The <seealso cref="ILocalePhrases"/>.</param>
         /// <param name="dateTimeConverter">The date time converter.</param>
+        ///  <param name="config">The Configuration</param>
+        ///  <param name="allyNodeMasterStore">The mongoDB Store</param>
+        ///  <param name="dataHistoryInfluxStore">The Influx Store</param>
         /// <exception cref="ArgumentNullException">
         /// <paramref name="contextFactory"/> is null.
         /// or
@@ -46,12 +55,16 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql
         /// or
         /// </exception>
         public RodLiftAnalysisSQLStore(IThetaDbContextFactory<NoLockXspocDbContext> contextFactory,
-            ILocalePhrases localePhrases, IThetaLoggerFactory loggerFactory, IDateTimeConverter dateTimeConverter) : base(contextFactory, loggerFactory)
+            ILocalePhrases localePhrases, IThetaLoggerFactory loggerFactory, IDateTimeConverter dateTimeConverter, IConfiguration config, IAllyTimeSeriesNodeMaster allyNodeMasterStore,
+            IGetDataHistoryItemsService dataHistoryInfluxStore) : base(contextFactory, loggerFactory)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _ = localePhrases ?? throw new ArgumentNullException(nameof(localePhrases));
             _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
             _dateTimeConverter = dateTimeConverter ?? throw new ArgumentNullException(nameof(dateTimeConverter));
+            _config = config ?? throw new ArgumentNullException(nameof(config));
+            _allyNodeMasterStore = allyNodeMasterStore ?? throw new ArgumentNullException(nameof(allyNodeMasterStore));
+            _dataHistoryInfluxStore = dataHistoryInfluxStore ?? throw new ArgumentNullException(nameof(dataHistoryInfluxStore));
         }
 
         #endregion
@@ -142,7 +155,17 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql
                 response.PumpingUnitAPIDesignation = pumpingUnitAPIDesignation;
 
                 response.XDiagResults = GetXDiagResultData(assetId, cardDate);
-                response.CurrentRawScanData = GetCurrentRawScanData(assetId);
+
+                // Influx enabled
+                if (bool.TryParse(_config.GetSection("EnableInflux").Value, out bool isInfluxEnabled) && isInfluxEnabled)
+                {
+                    response.CurrentRawScanData = GetCurrentRawScanData(assetId, node.NodeId, correlationId);
+                }
+                else
+                {
+                    response.CurrentRawScanData = GetCurrentRawScanData(assetId);
+                }
+
                 var upliftOppMinimumProductionThresholdValue
                     = GetSystemParameterData(UPLIFT_OPP_MINIMUM_PRODUCTION_THRESHOLD);
                 response.SystemParameters =
@@ -216,6 +239,133 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql
             return pumpingUnitId.IndexOf("~X") == 0;
         }
 
+        /// <summary>
+        /// Create Same Trend Data Response from Influx OSS/Enterprise.
+        /// </summary>
+        /// <param name="trendData"></param>
+        /// <param name="channelIds"></param>
+        /// <returns></returns>
+        private List<DataPointModel> CreateTrendDataResponseFromInflux(IList<DataPointModel> trendData, List<string> channelIds = null)
+        {
+            var responseData = new List<DataPointModel>();
+            if (trendData != null && trendData.Count > 0)
+            {
+                if (trendData.Any(a => a.ColumnValues != null))
+                {
+                    // If channelIds is null, get all keys from ColumnValues
+                    var channelsToProcess = channelIds ?? trendData
+                        .Where(a => a.ColumnValues != null)
+                        .SelectMany(a => a.ColumnValues.Keys)
+                        .Distinct()
+                        .ToList();
+
+                    foreach (var channel in channelsToProcess)
+                    {
+                        var data = trendData
+                            .Where(a => a.ColumnValues != null &&
+                                                           a.ColumnValues[channel]?.ToString() != null)
+                            .Select(x => new DataPointModel()
+                            {
+                                Time = x.Time,
+                                Value = decimal.Parse(x.ColumnValues[channel]),
+                                TrendName = channel,
+                                POCTypeId = x.POCTypeId
+                            }).ToList();
+                        responseData.AddRange(data);
+                    }
+                }
+                else
+                {
+                    responseData = trendData
+                    .Where(a => a.Value != null)
+                    .Select(x => new DataPointModel()
+                    {
+                        Time = x.Time,
+                        Value = decimal.Parse(x.Value.ToString()),
+                        TrendName = x.TrendName,
+                        POCTypeId = x.POCTypeId
+                    }).ToList();
+                }
+            }
+
+            return responseData.OrderBy(a => a.Time).ToList();
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="crsdi"></param>
+        /// <param name="nodeId"></param>
+        /// <param name="parameters"></param>
+        /// <returns></returns>
+        private IList<CurrentRawScanDataModel> MapCurrentRawScanData(List<DataPointModel> crsdi, string nodeId,
+            IDictionary<(int POCType, string ChannelId), ParameterMongo.Parameters> parameters)
+        {
+            IList<CurrentRawScanDataModel> currentRawScanData = new List<CurrentRawScanDataModel>();
+
+            foreach (var item in crsdi)
+            {
+                var key = (POCType: int.Parse(item.POCTypeId), item.TrendName);
+                var parameter = parameters.TryGetValue(key, out var param) ? param : null;
+
+                var crsm = new CurrentRawScanDataModel
+                {
+                    NodeId = nodeId,
+                    Value = float.TryParse(item.Value?.ToString(), out var floatVal) ? floatVal : null,
+                    DateTimeUpdated = item?.Time,
+                    Address = parameter != null ? parameter.Address : 0,
+                    StringValue = string.Empty // Need to Check
+                };
+
+                currentRawScanData.Add(crsm);
+            }
+
+            return currentRawScanData;
+        }
+
+        /// <summary>
+        /// Get the current raw scan data based on asset id
+        /// </summary>
+        /// <param name="assetId">The asset GUID</param>
+        /// <param name="nodeId"></param>
+        /// <param name="correlationId"></param>
+        /// <returns>The <seealso cref="IList{CurrentRawScanDataModel}" /></returns>
+        private IList<CurrentRawScanDataModel> GetCurrentRawScanData(Guid assetId, string nodeId, string correlationId)
+        {
+            // Declare variable.
+            IList<CurrentRawScanDataModel> currentRawScanData = new List<CurrentRawScanDataModel>();
+
+            // Get asset data.
+            var assetData = _allyNodeMasterStore.GetAssetAsync(assetId, correlationId).GetAwaiter().GetResult();
+            if (assetData != null)
+            {
+                var customerObjId = assetData?.CustomerId;
+                var customerData = _allyNodeMasterStore.GetCustomerAsync(customerObjId, correlationId).GetAwaiter().GetResult();
+
+                // Get customer data.
+                var customerGUID = Guid.TryParse(customerData?.LegacyId?["CustomerGUID"], out var parsedGuid)
+                    ? parsedGuid
+                    : Guid.Empty;
+
+                var latestTrendDataRecords = _dataHistoryInfluxStore.GetCurrentRawScanData(assetId, customerGUID).Result;
+                if (latestTrendDataRecords != null && latestTrendDataRecords.Count > 0)
+                {
+                    // Trend data Response updated.
+                    var trendDataResultSet = CreateTrendDataResponseFromInflux(latestTrendDataRecords);
+
+                    // Get Parameter key based on poctype and ChannelId/TrendName.
+                    var parameterKeys = trendDataResultSet.Select(item => (POCType: int.Parse(item.POCTypeId), ChannelId: item.TrendName)).Distinct().ToList();
+
+                    // Get parameters from MongoDB.
+                    var parameters = _allyNodeMasterStore.GetParametersBulk(parameterKeys, correlationId).GetAwaiter().GetResult();
+
+                    // Map the trend data to the current raw scan data.
+                    currentRawScanData = MapCurrentRawScanData(trendDataResultSet, nodeId, parameters);
+                }
+            }
+
+            return currentRawScanData;
+        }
         #endregion
 
     }

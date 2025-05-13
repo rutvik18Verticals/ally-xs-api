@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System;
+using System.Threading.Tasks;
 using Theta.XSPOC.Apex.Api.Common;
 using Theta.XSPOC.Apex.Api.Core.Logging;
 using Theta.XSPOC.Apex.Api.Core.Models.Inputs;
@@ -99,7 +100,6 @@ namespace Theta.XSPOC.Apex.Api.Controllers
             return Ok(serviceResult);
         }
 
-
         /// <summary>
         /// Handles the requests to save user preferences for widgets
         /// </summary>
@@ -129,8 +129,10 @@ namespace Theta.XSPOC.Apex.Api.Controllers
             ControllerLogger.WriteCId(Level.Trace, $"Finished {nameof(DashboardController)} {nameof(SaveUserPreferences)}", correlationId);
 
             if (!serviceResult.Result)
+            {
                 return defaultInvalidStatusCodeResult;
-            
+            }
+
             return Ok();
         }
 
@@ -148,7 +150,9 @@ namespace Theta.XSPOC.Apex.Api.Controllers
         public IActionResult ResetUserPreferences(DashboardWidgetResetUserPreferencesInput input)
         {
             if (input == null)
+            {
                 throw new ArgumentNullException(nameof(input), "Input cannot be null.");
+            }
 
             GetOrCreateCorrelationId(out var correlationId);
             ControllerLogger.WriteCId(Level.Trace, $"Starting {nameof(DashboardController)} {nameof(ResetUserPreferences)}", correlationId);
@@ -165,12 +169,53 @@ namespace Theta.XSPOC.Apex.Api.Controllers
 
             ControllerLogger.WriteCId(Level.Trace, $"Finished {nameof(DashboardController)} {nameof(ResetUserPreferences)}", correlationId);
 
-            if (!serviceResult.Result)
+            if (!ValidateServiceResult(correlationId, out defaultInvalidStatusCodeResult, serviceResult.Result))
+            {
                 return defaultInvalidStatusCodeResult;
+            }
 
-            return Get(input.DashboardName);
+            return Ok(serviceResult.Result);
         }
 
+        /// <summary>
+        /// Handles requests for fetching the esp well charts widgets.
+        /// </summary>
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status501NotImplemented)]
+        [HttpGet]
+        [Authorize]
+        [Route("/widgets/tags/{liftType}")]
+        public async Task<IActionResult> GetTags(string liftType)
+        {
+            GetOrCreateCorrelationId(out var correlationId);
+            ControllerLogger.WriteCId(Level.Trace, $"Starting {nameof(DashboardController)} {nameof(GetTags)}", correlationId);
+
+            if (!ValidateUserAuthorized(correlationId, out var defaultInvalidStatusCodeResult, out var user))
+            {
+                ControllerLogger.WriteCId(Level.Trace, $"Finished {nameof(DashboardController)} {nameof(GetTags)}", correlationId);
+
+                return defaultInvalidStatusCodeResult;
+            }
+
+            if (string.IsNullOrWhiteSpace(liftType))
+            {
+                ControllerLogger.WriteCId(Level.Trace, $"Finished {nameof(DashboardController)} {nameof(GetTags)}", correlationId);
+
+                throw new ArgumentNullException(nameof(liftType), "Input cannot be null.");
+            }
+
+            var serviceResult = await _service.GetAllDefaultParameters(liftType, correlationId);
+
+            if (!ValidateServiceResult(correlationId, out defaultInvalidStatusCodeResult, serviceResult))
+            {
+                ControllerLogger.WriteCId(Level.Trace, $"Finished {nameof(DashboardController)} {nameof(GetTags)}", correlationId);
+
+                return defaultInvalidStatusCodeResult;
+            }
+
+            return Ok(serviceResult);
+        }
         #endregion
 
     }

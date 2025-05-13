@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -20,6 +21,8 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql.Alarm
         #region Private Fields
 
         private readonly IThetaDbContextFactory<NoLockXspocDbContext> _thetaDbContextFactory;
+        private readonly IConfiguration _configuration;
+        private readonly IAlarmInfluxStore _alarmInfluxStore;
 
         #endregion
 
@@ -30,13 +33,17 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql.Alarm
         /// <paramref name="thetaDbContextFactory"/>.
         /// </summary>
         /// <param name="thetaDbContextFactory">The theta db context factory used to get a db context.</param>
+        /// <param name="alarmInfluxStore">The theta db context factory used to get a db context.</param>
+        /// <param name="configuration">The theta db context factory used to get a db context.</param>
         /// <exception cref="ArgumentNullException">
         /// when <paramref name="thetaDbContextFactory"/> is null.
         /// </exception>
-        public AlarmSQLStore(IThetaDbContextFactory<NoLockXspocDbContext> thetaDbContextFactory)
+        public AlarmSQLStore(IThetaDbContextFactory<NoLockXspocDbContext> thetaDbContextFactory, IAlarmInfluxStore alarmInfluxStore, IConfiguration configuration)
         {
             _thetaDbContextFactory =
                 thetaDbContextFactory ?? throw new ArgumentNullException(nameof(thetaDbContextFactory));
+            _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+            _alarmInfluxStore = alarmInfluxStore ?? throw new ArgumentNullException(nameof(alarmInfluxStore));
         }
 
         #endregion
@@ -60,6 +67,21 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql.Alarm
                 return null;
             }
 
+            bool isInfluxEnabled = _configuration.GetValue("EnableInflux", false);
+            if (isInfluxEnabled)
+            {
+                return await GetAlarmConfigurationFromInfluxAsync(assetId, customerId);
+            }
+            return await GetAlarmConfigurationFromSqlAsync(assetId);
+        }
+
+        /// <summary>
+        /// Retrieves alarm configuration data from the database for the specified asset.
+        /// </summary>
+        /// <param name="assetId">The asset id used to get the alarm configuration data.</param>
+        /// <returns>A list of alarm configuration data for the provided asset id.</returns>
+        private async Task<IList<AlarmData>> GetAlarmConfigurationFromSqlAsync(Guid assetId)
+        {
             await using (var context = _thetaDbContextFactory.GetContext())
             {
                 var result = context.NodeMasters.Join(context.AlarmConfigByPocTypes, l => l.PocType, r => r.PocType,
@@ -132,8 +154,96 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql.Alarm
                             : 0,
                         StateText = m.right == null ? null : m.right.Text,
                     });
-
                 return result.ToList();
+            }
+        }
+
+        /// <summary>
+        /// Retrieves alarm configuration data from the database for the specified asset.
+        /// </summary>
+        /// <param name="assetId">The asset id used to get the alarm configuration data.</param>
+        /// <param name="customerId">The asset id used to get the alarm configuration data.</param>
+        /// <returns>A list of alarm configuration data for the provided asset id.</returns>
+        private async Task<IList<AlarmData>> GetAlarmConfigurationFromInfluxAsync(Guid assetId, Guid customerId)
+        {
+            await using (var context = _thetaDbContextFactory.GetContext())
+            {
+                // First, we need to get the required data from SQL tables (everything except CurrentRawScans)
+                var alarmsWithParameters = context.NodeMasters
+                    .Join(context.AlarmConfigByPocTypes, l => l.PocType, r => r.PocType,
+                        (node, alarm) => new
+                        {
+                            node,
+                            alarm,
+                        })
+                    .Join(context.Parameters, l => new
+                    {
+                        Key1 = l.alarm.PocType,
+                        Key2 = l.alarm.Register,
+                    }
+                    , r => new
+                    {
+                        Key1 = r.Poctype,
+                        Key2 = r.Address,
+                    },
+                    (alarmWithNode, parameters) => new
+                    {
+                        Node = alarmWithNode.node,
+                        Alarm = alarmWithNode.alarm,
+                        Parameters = parameters
+                    })
+                    .Where(m => m.Node.AssetGuid == assetId && m.Alarm.Enabled)
+                    .ToList();
+
+                var nodeId = context.NodeMasters.Where(nm => nm.AssetGuid == assetId).Select(nm => nm.NodeId).FirstOrDefaultAsync().ToString();
+
+                var influxData = await _alarmInfluxStore.GetCurrentRawScanDataFromInflux(assetId, customerId, nodeId);
+
+                var result = alarmsWithParameters
+                    .GroupJoin(influxData,
+                        sql => new { sql.Node.NodeId, Address = sql.Alarm.Register },
+                        influx => new { influx.NodeId, influx.Address },
+                        (sql, influxGroup) => new
+                        {
+                            sql,
+                            scan = influxGroup.FirstOrDefault()
+                        })
+                    .GroupJoin(context.States, l => new
+                    {
+                        Key1 = l.sql.Parameters.StateId,
+                        Key2 = l.scan?.Value
+                    }, r => new
+                    {
+                        Key1 = (int?)r.StateId,
+                        Key2 = (float?)r.Value,
+                    }, (alarmWithScan, state) => new
+                    {
+                        alarmWithScan,
+                        state,
+                    })
+                    .SelectMany(m => m.state.DefaultIfEmpty(), (left, right) => new
+                    {
+                        left,
+                        right,
+                    })
+                    .Select(m => new AlarmData()
+                    {
+                        AlarmType = "RTU",
+                        AlarmRegister = m.left.alarmWithScan.sql.Alarm.Register.ToString(),
+                        AlarmBit = m.left.alarmWithScan.sql.Alarm.Bit,
+                        AlarmDescription = m.left.alarmWithScan.sql.Alarm.Description,
+                        AlarmPriority = m.left.alarmWithScan.sql.Alarm.Priority,
+                        AlarmNormalState = m.left.alarmWithScan.sql.Alarm.NormalState
+                            ? 1
+                            : 0,
+                        CurrentValue = m.left.alarmWithScan.scan?.Value != null
+                            ? (float)m.left.alarmWithScan.scan.Value
+                            : 0,
+                        StateText = m.right?.Text,
+                    })
+                    .ToList();
+
+                return result;
             }
         }
 

@@ -13,6 +13,8 @@ using Theta.XSPOC.Apex.Api.Data.Sql.Logging;
 using Theta.XSPOC.Apex.Kernel.Data.Sql.Entity;
 using Theta.XSPOC.Apex.Kernel.Logging;
 using Theta.XSPOC.Apex.Kernel.Logging.Models;
+using System.Threading.Tasks;
+using Parameters = Theta.XSPOC.Apex.Kernel.Mongo.Models.Parameter.Parameters;
 
 namespace Theta.XSPOC.Apex.Api.Data.Sql
 {
@@ -159,7 +161,7 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql
             bool isInfluxEnabled = _configuration.GetValue("EnableInflux", false);
             if (isInfluxEnabled)
             {
-                return _dataHistoryMongoStore.GetMeasurementTrendData(nodeId, paramStandardType, startDate, endDate, correlationId);
+                return GetMeasurementTrendDataUsingMongoInfux(nodeId, paramStandardType, startDate, endDate, correlationId).Result;
             }
             else
             {
@@ -175,120 +177,16 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql
         /// <returns>The <seealso cref="IList{MeasurementTrendItemModel}"/>.</returns>
         public IList<MeasurementTrendItemModel> GetMeasurementTrendItems(string nodeId, string correlationId)
         {
-            var logger = LoggerFactory.Create(LoggingModel.SQLStore);
-            logger.WriteCId(Level.Trace, $"Starting {nameof(DataHistorySQLStore)} {nameof(GetMeasurementTrendItems)}", correlationId);
-
-            IList<MeasurementTrendItemModel> dataModels =
-                new List<MeasurementTrendItemModel>();
-
-            string cacheKey = string.Empty;
-            using (var context = _contextFactory.GetContext())
+            bool isInfluxEnabled = _configuration.GetValue("EnableInflux", false);
+            if (isInfluxEnabled)
             {
-                var assetGuid = context.NodeMasters.AsNoTracking()
-                     .Where(x => x.NodeId == nodeId)
-                     .Select(x => x.AssetGuid).FirstOrDefault();
-
-                cacheKey = $"MeasurementTrendItems::{assetGuid}";
-            }
-
-            if (_cache.TryGetValue<IList<MeasurementTrendItemModel>>(cacheKey, out var measurementTrend))
-            {
-                dataModels = measurementTrend;
+                return GetMeasurementTrendItemsUsingMongoInflux(nodeId, correlationId).Result;
             }
             else
-            {
-                using (var context = _contextFactory.GetContext())
-                {
-                    var result = (from p in context.Parameters.AsNoTracking()
-                                  join t in context.FacilityTags.AsNoTracking()
-                                      on p.Address equals t.Address into tagGroup
-                                  from t in tagGroup.DefaultIfEmpty()
-                                  where (p.Poctype == 99
-                                  || GetNodeID(nodeId).Contains((short)p.Poctype)
-                                 || p.Poctype == GetNodeIDCase(nodeId)
-                                 && t == null
-                                 && p.ParamStandardType != null)
-                                  select new MeasurementTrendItemModel
-                                  {
-                                      ParamStandardType = p.ParamStandardType,
-                                      Address = p.Address,
-                                      Description = p.Description,
-                                      PhraseID = p.PhraseId,
-                                      ParameterType = p.Poctype == 99 ? "1" : "2"
-                                  }).AsEnumerable();
-
-                    result = result.Union(context.FacilityTags.AsNoTracking()
-                            .Where(x => x.GroupNodeId == nodeId
-                            && x.ParamStandardType != null)
-                            .Select(x => new MeasurementTrendItemModel
-                            {
-                                ParamStandardType = x.ParamStandardType,
-                                Address = x.Address,
-                                Description = x.Description,
-                                PhraseID = null,
-                                ParameterType = "2",
-                            }).AsEnumerable());
-
-                    var resultDataHistory = context.DataHistory.AsNoTracking().
-                                        Where(x => x.NodeID == nodeId)
-                                        .Select(x => new MeasurementTrendItemModel
-                                        { Address = x.Address }).Distinct().AsEnumerable();
-
-                    resultDataHistory = resultDataHistory.Union
-                                        (context.DataHistoryArchive.AsNoTracking()
-                                        .Where(x => x.NodeID == nodeId)
-                                        .Select(x => new MeasurementTrendItemModel
-                                        { Address = x.Address }).Distinct().AsEnumerable());
-                    resultDataHistory = resultDataHistory.DistinctBy(x => x.Address);
-
-                    var resultData = (from a in result
-                                      join d in resultDataHistory
-                                          on a.Address equals d.Address
-                                      join p in context.ParamStandardTypes.AsNoTracking()
-                                      on a.ParamStandardType equals p.ParamStandardType
-                                      join LocalePhrases1 in context.LocalePhrases.AsNoTracking()
-                                      on p.PhraseId equals LocalePhrases1.PhraseId
-                                      into phraseResult
-                                      join LocalePhrases2 in context.LocalePhrases.AsNoTracking()
-                                      on a.PhraseID equals LocalePhrases2.PhraseId
-                                      into resultPhrase
-                                      select new MeasurementTrendItemModel
-                                      {
-                                          ParamStandardType = p.ParamStandardType,
-                                          Name = p.Description,
-                                          UnitTypeID = p.UnitTypeId,
-                                          Address = a.Address,
-                                          Description = a.Description,
-                                      }).AsEnumerable();
-
-                    var groupdata = from d in resultData
-                                    group d by d.ParamStandardType into g
-                                    select new
-                                    {
-                                        g.Key,
-                                        Items = g.Select((item, index) => new { Item = item, Index = index + 1 }) // Assigning row numbers
-                                    };
-
-                    dataModels = groupdata.SelectMany(g => g.Items, (g, item) => new MeasurementTrendItemModel
-                    {
-                        Name = item.Item.Name,
-                        ParamStandardType = item.Item.ParamStandardType,
-                        UnitTypeID = item.Item.UnitTypeID,
-                        Address = item.Item.Address,
-                        Description = item.Item.Description,
-                    }).DistinctBy(x => x.ParamStandardType)
-                    .OrderBy(x => x.Name)
-                    .ThenBy(p => p.ParamStandardType)
-                    .ThenBy(p => p.Address)
-                    .ToList();
-
-                    _cache.Set<object>(cacheKey, dataModels);
-                }
+            { 
+                return GetMeasurementTrendItemsUsingSQL(nodeId, correlationId); // Call the SQL method if Influx is not enabled
             }
 
-            logger.WriteCId(Level.Trace, $"Finished {nameof(DataHistorySQLStore)} {nameof(GetMeasurementTrendItems)}", correlationId);
-
-            return dataModels;
         }
 
         /// <summary>
@@ -417,59 +315,14 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql
         /// <returns>The <seealso cref="ControllerTrendItemModel"/>.</returns>
         public IList<ControllerTrendItemModel> GetControllerTrendItems(string nodeId, int pocType, string correlationId)
         {
-            var logger = LoggerFactory.Create(LoggingModel.SQLStore);
-            logger.WriteCId(Level.Trace,
-                $"Starting {nameof(DataHistorySQLStore)} {nameof(GetControllerTrendItems)}",
-                correlationId);
-
-            using (var context = _contextFactory.GetContext())
+            bool isInfluxEnabled = _configuration.GetValue("EnableInflux", false);
+            if (isInfluxEnabled)
             {
-                var query = context.Parameters.AsNoTracking()
-                    .Where(p => (pocType == 99 || p.Poctype == pocType) &&
-                    p.ParamStandardType == null &&
-                    !context.FacilityTags.AsNoTracking().Where(t => t.GroupNodeId == nodeId &&
-                    t.Address == p.Address && t.Bit == 0).Any())
-                    .Select(p => new ControllerTrendItemModel()
-                    {
-                        Name = p.Description,
-                        Description = context.LocalePhrases
-                        .Where(l => l.PhraseId == p.PhraseId)
-                        .Select(l => l.English)
-                        .FirstOrDefault() ?? p.Description,
-                        Address = p.Address,
-                        UnitType = p.UnitType,
-                        FacilityTag = 0,
-                        Tag = null
-                    }).AsEnumerable();
-
-                query = query.Union(context.FacilityTags.AsNoTracking()
-                    .Where(t => t.Description != null && t.GroupNodeId == nodeId &&
-                        t.ParamStandardType == null)
-                        .Select(t => new ControllerTrendItemModel()
-                        {
-                            Name = t.Description,
-                            Description = t.Description ?? string.Empty,
-                            Address = t.Address,
-                            UnitType = t.UnitType,
-                            FacilityTag = 1,
-                            Tag = t.Tag
-                        })).AsEnumerable();
-
-                var result = query.Join(context.DataHistory.AsNoTracking()
-                        .Where(dh => dh.NodeID == nodeId)
-                        .Select(dh => dh.Address)
-                        .Union(context.DataHistoryArchive
-                            .Where(dha => dha.NodeID == nodeId)
-                            .Select(dha => dha.Address)),
-                        p => p.Address,
-                        h => h,
-                        (p, h) => p)
-                    .ToList();
-
-                logger.WriteCId(Level.Trace, $"Finished {nameof(DataHistorySQLStore)}" +
-               $" {nameof(GetControllerTrendItems)}", correlationId);
-
-                return result;
+                return GetControllerTrendItemsUsingMongoInflux(nodeId, pocType, correlationId).Result;
+            }
+            else
+            {
+                return GetControllerTrendItemsUsingSQL(nodeId, pocType,correlationId);
             }
         }
 
@@ -1694,41 +1547,15 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql
         public IList<ControllerTrendDataModel> GetControllerTrendData(string nodeId,
             int address, DateTime startDate, DateTime endDate, string correlationId)
         {
-            var logger = LoggerFactory.Create(LoggingModel.SQLStore);
-            logger.WriteCId(Level.Trace, $"Starting {nameof(DataHistorySQLStore)} {nameof(GetControllerTrendData)}", correlationId);
-
-            List<ControllerTrendDataModel> listControllerTrendDataModel
-                = new List<ControllerTrendDataModel>();
-            float maxDecimal = 9999999999999999999999999999f;
-
-            using (var context = _contextFactory.GetContext())
+            bool isInfluxEnabled = _configuration.GetValue("EnableInflux", false);
+            if (isInfluxEnabled)
             {
-                listControllerTrendDataModel.AddRange(
-                    context.DataHistory.AsNoTracking()
-                        .Where(x => x.NodeID == nodeId &&
-                            x.Address == address &&
-                            x.Date >= @startDate && x.Date <= endDate)
-                        .Select(x => new ControllerTrendDataModel
-                        {
-                            Date = x.Date,
-                            Value = x.Value > maxDecimal ? maxDecimal : x.Value
-                        }).ToList());
-
-                listControllerTrendDataModel.AddRange(
-                    context.DataHistoryArchive.AsNoTracking()
-                        .Where(x => x.NodeID == nodeId &&
-                            x.Address == address &&
-                            x.Date >= @startDate && x.Date <= endDate)
-                        .Select(x => new ControllerTrendDataModel
-                        {
-                            Date = x.Date,
-                            Value = x.Value > maxDecimal ? maxDecimal : x.Value
-                        }).ToList());
+                return _dataHistoryMongoStore.GetControllerTrendData(nodeId, address, startDate, endDate, correlationId).GetAwaiter().GetResult();
             }
-
-            logger.WriteCId(Level.Trace, $"Finished {nameof(DataHistorySQLStore)} {nameof(GetControllerTrendData)}", correlationId);
-
-            return listControllerTrendDataModel.OrderBy(x => x.Date).ToList();
+            else
+            {
+                return GetControllerTrendDataUsingSQL(nodeId, address, startDate, endDate, correlationId);
+            }
         }
 
         /// <summary>
@@ -1740,141 +1567,14 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql
         /// <returns>The <see cref="DowntimeByWellsModel"/>.</returns>
         public DowntimeByWellsModel GetDowntime(IList<string> nodeIds, int numberOfDays, string correlationId)
         {
-            var logger = LoggerFactory.Create(LoggingModel.SQLStore);
-            logger.WriteCId(Level.Trace, $"Starting {nameof(DataHistorySQLStore)} {nameof(GetDowntime)}", correlationId);
-
-            const int pstFrequency = 2;
-            const int pstRunTime = 179;
-            const int pstIdleTime = 180;
-            const int pstCycles = 181;
-            const int pstGasInjectionRate = 191;
-            const int applicationRodPump = 3;
-            const int applicationESP = 4;
-            const int applicationGL = 7;
-
-            var numberOfRecentDays = DateTime.UtcNow.Date.AddDays(-numberOfDays);
-
-            using (var context = _contextFactory.GetContext())
+            bool isInfluxEnabled = _configuration.GetValue("EnableInflux", false);
+            if (isInfluxEnabled)
             {
-                var queryRunTime = context.DataHistory.AsNoTracking().Where(x => x.Value > 0)
-                    .Join(context.Parameters.Where(x => x.ParamStandardType == pstRunTime), dh => dh.Address, p => p.Address, (dh, p) => new
-                    {
-                        DataHistoryRuntime = dh,
-                    });
-
-                var queryIdleTime = context.DataHistory.AsNoTracking()
-                    .Join(context.Parameters.Where(x => x.ParamStandardType == pstIdleTime), dh => dh.Address, p => p.Address, (dh, p) => new
-                    {
-                        DataHistoryIdleTime = dh,
-                    });
-
-                var queryCycles = context.DataHistory.AsNoTracking()
-                    .Join(context.Parameters.Where(x => x.ParamStandardType == pstCycles), dh => dh.Address, p => p.Address, (dh, p) => new
-                    {
-                        DataHistoryCycles = dh,
-                    });
-
-                var rodPumpResultPrimary = queryRunTime.Join(queryIdleTime, x => new
-                {
-                    x.DataHistoryRuntime.NodeID,
-                    x.DataHistoryRuntime.Date
-                }, x => new
-                {
-                    x.DataHistoryIdleTime.NodeID,
-                    x.DataHistoryIdleTime.Date
-                }, (x, dh) => new
-                {
-                    x.DataHistoryRuntime,
-                    dh.DataHistoryIdleTime,
-                })
-                    .Join(queryCycles, x => new
-                    {
-                        x.DataHistoryRuntime.NodeID,
-                        x.DataHistoryRuntime.Date,
-                    }, x => new
-                    {
-                        x.DataHistoryCycles.NodeID,
-                        x.DataHistoryCycles.Date,
-                    }, (x, dh) => new
-                    {
-                        x.DataHistoryRuntime,
-                        x.DataHistoryIdleTime,
-                        dh.DataHistoryCycles
-                    })
-                    .Where(x => x.DataHistoryRuntime.Date > numberOfRecentDays)
-                     .Join(context.NodeMasters.AsNoTracking().Where(x => x.ApplicationId == applicationRodPump && nodeIds.Contains(x.NodeId)), x => x.DataHistoryRuntime.NodeID, nm => nm.NodeId,
-                        (x, nm) => new
-                        {
-                            x.DataHistoryRuntime,
-                            x.DataHistoryIdleTime,
-                            x.DataHistoryCycles,
-                            NodeMaster = nm,
-                        })
-                    .Select(x => new
-                    {
-                        NodeId = x.DataHistoryRuntime.NodeID,
-                        Runtime = x.DataHistoryRuntime.Value,
-                        IdleTime = x.DataHistoryIdleTime.Value,
-                        Cycles = x.DataHistoryCycles.Value,
-                        x.DataHistoryRuntime.Date
-                    })
-                    .ToList();
-
-                var rodPumpResult = rodPumpResultPrimary.Distinct().Select(x => new DowntimeByWellsRodPumpModel()
-                {
-                    Id = x.NodeId,
-                    Runtime = x.Runtime,
-                    IdleTime = x.IdleTime,
-                    Cycles = x.Cycles,
-                    Date = x.Date,
-                });
-
-                var espResult = context.DataHistory.AsNoTracking().Where(x => nodeIds.Contains(x.NodeID) && x.Date > numberOfRecentDays)
-                    .Join(context.NodeMasters.AsNoTracking().Where(x => x.ApplicationId == applicationESP), dh => dh.NodeID, nm => nm.NodeId, (dh, nm) => new
-                    {
-                        DataHistory = dh,
-                        NodeMaster = nm,
-                    })
-                    .Join(context.Parameters.AsNoTracking().Where(x => x.ParamStandardType == pstFrequency), x => x.DataHistory.Address, p => p.Address, (x, p) => new
-                    {
-                        x.DataHistory,
-                    })
-                    .ToList()
-                    .Select(x => new DowntimeByWellsValueModel()
-                    {
-                        Id = x.DataHistory.NodeID,
-                        Value = x.DataHistory.Value,
-                        Date = x.DataHistory.Date,
-                    });
-
-                var glResult = context.DataHistory.AsNoTracking().Where(x => nodeIds.Contains(x.NodeID) && x.Date > numberOfRecentDays)
-                    .Join(context.NodeMasters.AsNoTracking().Where(x => x.ApplicationId == applicationGL), dh => dh.NodeID, nm => nm.NodeId, (dh, nm) => new
-                    {
-                        DataHistory = dh,
-                        NodeMaster = nm,
-                    })
-                    .Join(context.Parameters.AsNoTracking().Where(x => x.ParamStandardType == pstGasInjectionRate), x => x.DataHistory.Address, p => p.Address, (x, p) => new
-                    {
-                        x.DataHistory,
-                    })
-                    .ToList()
-                    .Select(x => new DowntimeByWellsValueModel()
-                    {
-                        Id = x.DataHistory.NodeID,
-                        Value = x.DataHistory.Value,
-                        Date = x.DataHistory.Date,
-                    });
-
-                var result = new DowntimeByWellsModel()
-                {
-                    RodPump = rodPumpResult.ToList(),
-                    ESP = espResult.ToList(),
-                    GL = glResult.ToList(),
-                };
-
-                logger.WriteCId(Level.Trace, $"Finished {nameof(DataHistorySQLStore)} {nameof(GetDowntime)}", correlationId);
-
-                return result;
+                return _dataHistoryMongoStore.GetDowntime(nodeIds, numberOfDays, correlationId).GetAwaiter().GetResult();
+            }
+            else
+            {
+                return GetDowntimeUsingSQL(nodeIds, numberOfDays, correlationId);
             }
         }
 
@@ -2045,6 +1745,114 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql
             return returnList;
         }
 
+        #region GetMeasurementTrendData Implementation
+        private async Task<IList<MeasurementTrendDataModel>> GetMeasurementTrendDataUsingMongoInfux(string nodeId,
+            int paramStandardType, DateTime startDate, DateTime endDate, string correlationId)
+        {
+                var logger = LoggerFactory.Create(LoggingModel.SQLStore);
+                logger.WriteCId(Level.Trace, $"Starting {nameof(DataHistorySQLStore)} {nameof(GetMeasurementTrendDataUsingMongoInfux)}", correlationId);
+
+                IList<MeasurementTrendDataModel> result;
+                float maxDecimal = 9999999999999999999999999999f;
+
+                var mongoInfluxData = await _dataHistoryMongoStore.GetMeasurementTrendData(
+                    nodeId, paramStandardType, startDate, endDate, correlationId);
+
+                var channelIds = mongoInfluxData
+                    .Select(item => item.TrendName)
+                    .Distinct()
+                    .ToList();
+
+                var parameters = _dataHistoryMongoStore.GetParametersBulk(channelIds, nodeId, correlationId)
+                    .GetAwaiter().GetResult();
+
+                var mongoInfluxResult = mongoInfluxData
+                    .Select(dataPoint =>
+                    {
+                        var matchingParameter = parameters
+                            .FirstOrDefault(p => p.Key.ChannelId == dataPoint.TrendName);
+                        return new
+                        {
+                            matchingParameter.Key.Address,
+                            dataPoint.Time,
+                            dataPoint.Value
+                        };
+                    })
+                    .Where(x => x.Address != 0)
+                    .ToList();
+
+            var influxList = mongoInfluxResult
+                .Select(md => new
+                {
+                    md.Address,
+                    md.Time,
+                    Value = Convert.ToSingle(md.Value) > maxDecimal ? maxDecimal : Convert.ToSingle(md.Value)
+                })
+                .ToList();
+
+            using var context = _contextFactory.GetContext();
+
+                // Get PocType beforehand to avoid nested EF translation issues
+                var pocType = context.NodeMasters
+                    .AsNoTracking()
+                    .Where(nm => nm.NodeId == nodeId)
+                    .Select(nm => nm.PocType)
+                    .FirstOrDefault();
+
+                // Get valid parameter addresses
+                var validParameterAddresses = context.Parameters
+                    .AsNoTracking()
+                    .Where(p =>
+                        (p.Poctype == pocType || p.Poctype == 99 || (pocType == 17 && p.Poctype == 8)) &&
+                        p.ParamStandardType == paramStandardType)
+                    .Select(p => new
+                    {
+                        p.Address,
+                        IsManual = p.Address > 4000 && p.Address <= 5000 ? 1 : 0
+                    })
+                    .ToList();
+
+                var facilityTags = context.FacilityTags
+                    .AsNoTracking()
+                    .Where(t => t.GroupNodeId == nodeId && t.ParamStandardType == paramStandardType)
+                    .Select(t => new
+                    {
+                        t.Address,
+                        IsManual = 0
+                    })
+                    .ToList();
+
+                var allTags = validParameterAddresses
+                    .Union(facilityTags)
+                    .ToList();
+
+                var facilityTagAddresses = facilityTags.Select(t => t.Address).ToList();
+                var additionalParamAddresses = context.Parameters
+                    .AsNoTracking()
+                    .Where(p => p.Poctype == 99 && p.ParamStandardType == paramStandardType)
+                    .Select(p => p.Address)
+                    .ToList();
+
+                var combinedFilterAddresses = facilityTagAddresses.Union(additionalParamAddresses).ToList();
+
+                result = (from d in allTags
+                          join dh in influxList on d.Address equals dh.Address
+                          where facilityTagAddresses.Count == 0 ||
+                                combinedFilterAddresses.Contains(d.Address)
+                          orderby dh.Time
+                          select new MeasurementTrendDataModel
+                          {
+                              Address = dh.Address,
+                              Date = dh.Time,
+                              Value = dh.Value,
+                              IsManual = d.IsManual == 1
+                          }).Distinct().ToList();
+
+                logger.WriteCId(Level.Trace, $"Finished {nameof(DataHistorySQLStore)} {nameof(GetMeasurementTrendDataUsingMongoInfux)}", correlationId);
+
+                return result;
+        }
+
         private IList<MeasurementTrendDataModel> GetMeasurementTrendDataUsingSQL(string nodeId,
             int paramStandardType, DateTime startDate, DateTime endDate, string correlationId)
         {
@@ -2118,7 +1926,609 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql
 
             return result;
         }
-            #endregion
 
+        #endregion
+
+        private IList<ControllerTrendDataModel> GetControllerTrendDataUsingSQL(string nodeId,
+            int address, DateTime startDate, DateTime endDate, string correlationId)
+        {
+            var logger = LoggerFactory.Create(LoggingModel.SQLStore);
+            logger.WriteCId(Level.Trace, $"Starting {nameof(DataHistorySQLStore)} {nameof(GetControllerTrendData)}", correlationId);
+
+            List<ControllerTrendDataModel> listControllerTrendDataModel
+                = new List<ControllerTrendDataModel>();
+            float maxDecimal = 9999999999999999999999999999f;
+
+            using (var context = _contextFactory.GetContext())
+            {
+                listControllerTrendDataModel.AddRange(
+                    context.DataHistory.AsNoTracking()
+                        .Where(x => x.NodeID == nodeId &&
+                            x.Address == address &&
+                            x.Date >= @startDate && x.Date <= endDate)
+                        .Select(x => new ControllerTrendDataModel
+                        {
+                            Date = x.Date,
+                            Value = x.Value > maxDecimal ? maxDecimal : x.Value
+                        }).ToList());
+
+                listControllerTrendDataModel.AddRange(
+                    context.DataHistoryArchive.AsNoTracking()
+                        .Where(x => x.NodeID == nodeId &&
+                            x.Address == address &&
+                            x.Date >= @startDate && x.Date <= endDate)
+                        .Select(x => new ControllerTrendDataModel
+                        {
+                            Date = x.Date,
+                            Value = x.Value > maxDecimal ? maxDecimal : x.Value
+                        }).ToList());
+            }
+
+            logger.WriteCId(Level.Trace, $"Finished {nameof(DataHistorySQLStore)} {nameof(GetControllerTrendData)}", correlationId);
+
+            return listControllerTrendDataModel.OrderBy(x => x.Date).ToList();
         }
+
+        #region GetMeasurementTrendItems Implementation
+        private async  Task<IList<MeasurementTrendItemModel>> GetMeasurementTrendItemsUsingMongoInflux(string nodeId, string correlationId)
+        {
+            var logger = LoggerFactory.Create(LoggingModel.SQLStore);
+            logger.WriteCId(Level.Trace, $"Starting {nameof(DataHistorySQLStore)} {nameof(GetMeasurementTrendItemsUsingMongoInflux)}", correlationId);
+
+            IList<MeasurementTrendItemModel> dataModels = new List<MeasurementTrendItemModel>();
+
+            // Fetch data from MongoDB using IDataHistoryMongoStore
+            IList<DataPointModel> mongoInfluxData = await _dataHistoryMongoStore.GetMeasurementTrendItems(nodeId);
+            //mongoInfluxData = mongoInfluxData.Where(item => string.IsNullOrWhiteSpace(item.POCTypeId) || string.IsNullOrWhiteSpace(item.TrendName)).ToList();
+
+            // Get Parameter key based on poctype and ChannelId/TrendName.
+            var channelIds = mongoInfluxData
+                    .Select(item => item.TrendName)
+                    .Distinct()
+                    .ToList();
+
+            // Get parameters from MongoDB.
+            IDictionary<(int Address, string ChannelId), Parameters> parameters = await _dataHistoryMongoStore.GetParametersBulk(channelIds,nodeId, correlationId);
+
+            var mongoInfluxResult = mongoInfluxData
+                    .Select(dataPoint =>
+                    {
+                        var matchingParameter = parameters
+                            .FirstOrDefault(p => p.Key.ChannelId == dataPoint.TrendName);
+
+                        return new
+                        {
+                            matchingParameter.Key.Address,
+                            dataPoint.Time,
+                            dataPoint.Value
+                        };
+                    })
+                    .Where(x => x.Address != 0) // filter out unmatched entries (default Address = 0)
+                    .ToList();
+
+            string cacheKey = string.Empty;
+            using (var context = _contextFactory.GetContext())
+            {
+                var assetGuid = context.NodeMasters.AsNoTracking()
+                     .Where(x => x.NodeId == nodeId)
+                     .Select(x => x.AssetGuid).FirstOrDefault();
+
+                cacheKey = $"MeasurementTrendItems::{assetGuid}";
+            }
+
+            if (_cache.TryGetValue<IList<MeasurementTrendItemModel>>(cacheKey, out var measurementTrend))
+            {
+                dataModels = measurementTrend;
+            }
+            else
+            {
+                using (var context = _contextFactory.GetContext())
+                {
+                    var result = (from p in context.Parameters.AsNoTracking()
+                                  join t in context.FacilityTags.AsNoTracking()
+                                      on p.Address equals t.Address into tagGroup
+                                  from t in tagGroup.DefaultIfEmpty()
+                                  where (p.Poctype == 99
+                                  || GetNodeID(nodeId).Contains((short)p.Poctype)
+                                 || p.Poctype == GetNodeIDCase(nodeId)
+                                 && t == null
+                                 && p.ParamStandardType != null)
+                                  select new MeasurementTrendItemModel
+                                  {
+                                      ParamStandardType = p.ParamStandardType,
+                                      Address = p.Address,
+                                      Description = p.Description,
+                                      PhraseID = p.PhraseId,
+                                      ParameterType = p.Poctype == 99 ? "1" : "2"
+                                  }).AsEnumerable();
+
+                    result = result.Union(context.FacilityTags.AsNoTracking()
+                            .Where(x => x.GroupNodeId == nodeId
+                            && x.ParamStandardType != null)
+                            .Select(x => new MeasurementTrendItemModel
+                            {
+                                ParamStandardType = x.ParamStandardType,
+                                Address = x.Address,
+                                Description = x.Description,
+                                PhraseID = null,
+                                ParameterType = "2",
+                            }).AsEnumerable());
+
+                    var resultDataHistory = mongoInfluxResult
+                                        .Select(x => new MeasurementTrendItemModel
+                                        { Address = x.Address }).Distinct().AsEnumerable();
+
+                    resultDataHistory = resultDataHistory.DistinctBy(x => x.Address);
+
+                    var resultData = (from a in result
+                                      join d in resultDataHistory
+                                          on a.Address equals d.Address
+                                      join p in context.ParamStandardTypes.AsNoTracking()
+                                      on a.ParamStandardType equals p.ParamStandardType
+                                      join LocalePhrases1 in context.LocalePhrases.AsNoTracking()
+                                      on p.PhraseId equals LocalePhrases1.PhraseId
+                                      into phraseResult
+                                      join LocalePhrases2 in context.LocalePhrases.AsNoTracking()
+                                      on a.PhraseID equals LocalePhrases2.PhraseId
+                                      into resultPhrase
+                                      select new MeasurementTrendItemModel
+                                      {
+                                          ParamStandardType = p.ParamStandardType,
+                                          Name = p.Description,
+                                          UnitTypeID = p.UnitTypeId,
+                                          Address = a.Address,
+                                          Description = a.Description,
+                                      }).AsEnumerable();
+
+                    var groupdata = from d in resultData
+                                    group d by d.ParamStandardType into g
+                                    select new
+                                    {
+                                        g.Key,
+                                        Items = g.Select((item, index) => new { Item = item, Index = index + 1 }) // Assigning row numbers
+                                    };
+
+                    dataModels = groupdata.SelectMany(g => g.Items, (g, item) => new MeasurementTrendItemModel
+                    {
+                        Name = item.Item.Name,
+                        ParamStandardType = item.Item.ParamStandardType,
+                        UnitTypeID = item.Item.UnitTypeID,
+                        Address = item.Item.Address,
+                        Description = item.Item.Description,
+                    }).DistinctBy(x => x.ParamStandardType)
+                    .OrderBy(x => x.Name)
+                    .ThenBy(p => p.ParamStandardType)
+                    .ThenBy(p => p.Address)
+                    .ToList();
+
+                    _cache.Set<object>(cacheKey, dataModels);
+                }
+            }
+
+            logger.WriteCId(Level.Trace, $"Finished {nameof(DataHistorySQLStore)} {nameof(GetMeasurementTrendItemsUsingMongoInflux)}", correlationId);
+
+            return dataModels;
+        }
+        private IList<MeasurementTrendItemModel> GetMeasurementTrendItemsUsingSQL(string nodeId, string correlationId)
+        {
+            var logger = LoggerFactory.Create(LoggingModel.SQLStore);
+            logger.WriteCId(Level.Trace, $"Starting {nameof(DataHistorySQLStore)} {nameof(GetMeasurementTrendItemsUsingSQL)}", correlationId);
+
+            IList<MeasurementTrendItemModel> dataModels =
+                new List<MeasurementTrendItemModel>();
+
+            string cacheKey = string.Empty;
+            using (var context = _contextFactory.GetContext())
+            {
+                var assetGuid = context.NodeMasters.AsNoTracking()
+                     .Where(x => x.NodeId == nodeId)
+                     .Select(x => x.AssetGuid).FirstOrDefault();
+
+                cacheKey = $"MeasurementTrendItems::{assetGuid}";
+            }
+
+            if (_cache.TryGetValue<IList<MeasurementTrendItemModel>>(cacheKey, out var measurementTrend))
+            {
+                dataModels = measurementTrend;
+            }
+            else
+            {
+                using (var context = _contextFactory.GetContext())
+                {
+                    var result = (from p in context.Parameters.AsNoTracking()
+                                  join t in context.FacilityTags.AsNoTracking()
+                                      on p.Address equals t.Address into tagGroup
+                                  from t in tagGroup.DefaultIfEmpty()
+                                  where (p.Poctype == 99
+                                  || GetNodeID(nodeId).Contains((short)p.Poctype)
+                                 || p.Poctype == GetNodeIDCase(nodeId)
+                                 && t == null
+                                 && p.ParamStandardType != null)
+                                  select new MeasurementTrendItemModel
+                                  {
+                                      ParamStandardType = p.ParamStandardType,
+                                      Address = p.Address,
+                                      Description = p.Description,
+                                      PhraseID = p.PhraseId,
+                                      ParameterType = p.Poctype == 99 ? "1" : "2"
+                                  }).AsEnumerable();
+
+                    result = result.Union(context.FacilityTags.AsNoTracking()
+                            .Where(x => x.GroupNodeId == nodeId
+                            && x.ParamStandardType != null)
+                            .Select(x => new MeasurementTrendItemModel
+                            {
+                                ParamStandardType = x.ParamStandardType,
+                                Address = x.Address,
+                                Description = x.Description,
+                                PhraseID = null,
+                                ParameterType = "2",
+                            }).AsEnumerable());
+
+                    var resultDataHistory = context.DataHistory.AsNoTracking().
+                                        Where(x => x.NodeID == nodeId)
+                                        .Select(x => new MeasurementTrendItemModel
+                                        { Address = x.Address }).Distinct().AsEnumerable();
+
+                    resultDataHistory = resultDataHistory.Union
+                                        (context.DataHistoryArchive.AsNoTracking()
+                                        .Where(x => x.NodeID == nodeId)
+                                        .Select(x => new MeasurementTrendItemModel
+                                        { Address = x.Address }).Distinct().AsEnumerable());
+                    resultDataHistory = resultDataHistory.DistinctBy(x => x.Address);
+
+                    var resultData = (from a in result
+                                      join d in resultDataHistory
+                                          on a.Address equals d.Address
+                                      join p in context.ParamStandardTypes.AsNoTracking()
+                                      on a.ParamStandardType equals p.ParamStandardType
+                                      join LocalePhrases1 in context.LocalePhrases.AsNoTracking()
+                                      on p.PhraseId equals LocalePhrases1.PhraseId
+                                      into phraseResult
+                                      join LocalePhrases2 in context.LocalePhrases.AsNoTracking()
+                                      on a.PhraseID equals LocalePhrases2.PhraseId
+                                      into resultPhrase
+                                      select new MeasurementTrendItemModel
+                                      {
+                                          ParamStandardType = p.ParamStandardType,
+                                          Name = p.Description,
+                                          UnitTypeID = p.UnitTypeId,
+                                          Address = a.Address,
+                                          Description = a.Description,
+                                      }).AsEnumerable();
+
+                    var groupdata = from d in resultData
+                                    group d by d.ParamStandardType into g
+                                    select new
+                                    {
+                                        g.Key,
+                                        Items = g.Select((item, index) => new { Item = item, Index = index + 1 }) // Assigning row numbers
+                                    };
+
+                    dataModels = groupdata.SelectMany(g => g.Items, (g, item) => new MeasurementTrendItemModel
+                    {
+                        Name = item.Item.Name,
+                        ParamStandardType = item.Item.ParamStandardType,
+                        UnitTypeID = item.Item.UnitTypeID,
+                        Address = item.Item.Address,
+                        Description = item.Item.Description,
+                    }).DistinctBy(x => x.ParamStandardType)
+                    .OrderBy(x => x.Name)
+                    .ThenBy(p => p.ParamStandardType)
+                    .ThenBy(p => p.Address)
+                    .ToList();
+
+                    _cache.Set<object>(cacheKey, dataModels);
+                }
+            }
+
+            logger.WriteCId(Level.Trace, $"Finished {nameof(DataHistorySQLStore)} {nameof(GetMeasurementTrendItemsUsingSQL)}", correlationId);
+
+            return dataModels;
+        }
+
+        #endregion
+
+        private async Task<IList<ControllerTrendItemModel>> GetControllerTrendItemsUsingMongoInflux(string nodeId, int pocType, string correlationId)
+        {
+            var logger = LoggerFactory.Create(LoggingModel.SQLStore);
+            logger.WriteCId(Level.Trace, $"Starting {nameof(DataHistorySQLStore)} {nameof(GetControllerTrendItemsUsingMongoInflux)}", correlationId);
+
+            using (var context = _contextFactory.GetContext())
+            {
+                // Query for parameters
+                var query = context.Parameters.AsNoTracking()
+                    .Where(p => (pocType == 99 || p.Poctype == pocType) &&
+                                p.ParamStandardType == null &&
+                                !context.FacilityTags.AsNoTracking().Where(t => t.GroupNodeId == nodeId &&
+                                                                                 t.Address == p.Address && t.Bit == 0).Any())
+                    .Select(p => new ControllerTrendItemModel()
+                    {
+                        Name = p.Description,
+                        Description = context.LocalePhrases
+                            .Where(l => l.PhraseId == p.PhraseId)
+                            .Select(l => l.English)
+                            .FirstOrDefault() ?? p.Description,
+                        Address = p.Address,
+                        UnitType = p.UnitType,
+                        FacilityTag = 0,
+                        Tag = null
+                    }).AsEnumerable();
+
+                // Query for facility tags
+                query = query.Union(context.FacilityTags.AsNoTracking()
+                    .Where(t => t.Description != null && t.GroupNodeId == nodeId &&
+                                t.ParamStandardType == null)
+                    .Select(t => new ControllerTrendItemModel()
+                    {
+                        Name = t.Description,
+                        Description = t.Description ?? string.Empty,
+                        Address = t.Address,
+                        UnitType = t.UnitType,
+                        FacilityTag = 1,
+                        Tag = t.Tag
+                    })).AsEnumerable();
+
+                // Combine items
+                var combinedItems = query.ToList();
+
+                // Fetch asset data
+                var assetData = context.NodeMasters.AsNoTracking()
+                    .FirstOrDefault(nm => nm.NodeId == nodeId);
+
+                if (assetData == null || string.IsNullOrEmpty(assetData.NodeId))
+                {
+                    logger.WriteCId(Level.Trace, $"Finished {nameof(DataHistorySQLStore)} {nameof(GetControllerTrendItemsUsingMongoInflux)} - No Asset Data Found", correlationId);
+                    return new List<ControllerTrendItemModel>();
+                }
+
+                IList<DataPointModel> mongoInfluxData = await _dataHistoryMongoStore.GetControllerTrendItems(nodeId, pocType, correlationId);
+
+                // Get Parameter key based on poctype and ChannelId/TrendName.
+                var channelIds = mongoInfluxData
+                        .Select(item => item.TrendName)
+                        .Distinct()
+                        .ToList();
+
+                // Get parameters from MongoDB.
+                IDictionary<(int Address, string ChannelId), Parameters> parameters = await _dataHistoryMongoStore.GetParametersBulk(channelIds, pocType, correlationId);
+
+                var mongoInfluxResult = mongoInfluxData
+                   .Select(dataPoint =>
+                   {
+                       var matchingParameter = parameters
+                           .FirstOrDefault(p => p.Key.ChannelId == dataPoint.TrendName);
+
+                       return new
+                       {
+                           matchingParameter.Key.Address,
+                           dataPoint.Time,
+                           dataPoint.Value
+                       };
+                   })
+                   .Where(x => x.Address != 0) // filter out unmatched entries (default Address = 0)
+                   .ToList();
+
+                // Filter combined items by data history addresses
+                var result = query.Join(mongoInfluxResult
+                         .Select(dh => dh.Address),
+                         p => p.Address,
+                         h => h,
+                         (p, h) => p).Distinct()
+                     .ToList();
+
+                logger.WriteCId(Level.Trace, $"Finished {nameof(DataHistorySQLStore)} {nameof(GetControllerTrendItemsUsingMongoInflux)}", correlationId);
+
+                return result;
+            }
+        }
+
+        private IList<ControllerTrendItemModel> GetControllerTrendItemsUsingSQL(string nodeId, int pocType, string correlationId)
+        {
+            var logger = LoggerFactory.Create(LoggingModel.SQLStore);
+            logger.WriteCId(Level.Trace,
+                $"Starting {nameof(DataHistorySQLStore)} {nameof(GetControllerTrendItems)}",
+                correlationId);
+
+            using (var context = _contextFactory.GetContext())
+            {
+                var query = context.Parameters.AsNoTracking()
+                    .Where(p => (pocType == 99 || p.Poctype == pocType) &&
+                    p.ParamStandardType == null &&
+                    !context.FacilityTags.AsNoTracking().Where(t => t.GroupNodeId == nodeId &&
+                    t.Address == p.Address && t.Bit == 0).Any())
+                    .Select(p => new ControllerTrendItemModel()
+                    {
+                        Name = p.Description,
+                        Description = context.LocalePhrases
+                        .Where(l => l.PhraseId == p.PhraseId)
+                        .Select(l => l.English)
+                        .FirstOrDefault() ?? p.Description,
+                        Address = p.Address,
+                        UnitType = p.UnitType,
+                        FacilityTag = 0,
+                        Tag = null
+                    }).AsEnumerable();
+
+                query = query.Union(context.FacilityTags.AsNoTracking()
+                    .Where(t => t.Description != null && t.GroupNodeId == nodeId &&
+                        t.ParamStandardType == null)
+                        .Select(t => new ControllerTrendItemModel()
+                        {
+                            Name = t.Description,
+                            Description = t.Description ?? string.Empty,
+                            Address = t.Address,
+                            UnitType = t.UnitType,
+                            FacilityTag = 1,
+                            Tag = t.Tag
+                        })).AsEnumerable();
+
+                var result = query.Join(context.DataHistory.AsNoTracking()
+                        .Where(dh => dh.NodeID == nodeId)
+                        .Select(dh => dh.Address)
+                        .Union(context.DataHistoryArchive
+                            .Where(dha => dha.NodeID == nodeId)
+                            .Select(dha => dha.Address)),
+                        p => p.Address,
+                        h => h,
+                        (p, h) => p)
+                    .ToList();
+
+                logger.WriteCId(Level.Trace, $"Finished {nameof(DataHistorySQLStore)}" +
+               $" {nameof(GetControllerTrendItems)}", correlationId);
+
+                return result;
+            }
+        }
+
+        /// <summary>
+        /// Gets the downtime by wells.
+        /// </summary>
+        /// <param name="nodeIds">The node ids.</param>
+        /// <param name="numberOfDays">The number of days.</param>
+        /// <param name="correlationId"></param>
+        /// <returns>The <see cref="DowntimeByWellsModel"/>.</returns>
+        private DowntimeByWellsModel GetDowntimeUsingSQL(IList<string> nodeIds, int numberOfDays, string correlationId)
+        {
+            var logger = LoggerFactory.Create(LoggingModel.SQLStore);
+            logger.WriteCId(Level.Trace, $"Starting {nameof(DataHistorySQLStore)} {nameof(GetDowntimeUsingSQL)}", correlationId);
+
+            const int pstFrequency = 2;
+            const int pstRunTime = 179;
+            const int pstIdleTime = 180;
+            const int pstCycles = 181;
+            const int pstGasInjectionRate = 191;
+            const int applicationRodPump = 3;
+            const int applicationESP = 4;
+            const int applicationGL = 7;
+
+            var numberOfRecentDays = DateTime.UtcNow.Date.AddDays(-numberOfDays);
+
+            using (var context = _contextFactory.GetContext())
+            {
+                var queryRunTime = context.DataHistory.AsNoTracking().Where(x => x.Value > 0)
+                    .Join(context.Parameters.Where(x => x.ParamStandardType == pstRunTime), dh => dh.Address, p => p.Address, (dh, p) => new
+                    {
+                        DataHistoryRuntime = dh,
+                    });
+
+                var queryIdleTime = context.DataHistory.AsNoTracking()
+                    .Join(context.Parameters.Where(x => x.ParamStandardType == pstIdleTime), dh => dh.Address, p => p.Address, (dh, p) => new
+                    {
+                        DataHistoryIdleTime = dh,
+                    });
+
+                var queryCycles = context.DataHistory.AsNoTracking()
+                    .Join(context.Parameters.Where(x => x.ParamStandardType == pstCycles), dh => dh.Address, p => p.Address, (dh, p) => new
+                    {
+                        DataHistoryCycles = dh,
+                    });
+
+                var rodPumpResultPrimary = queryRunTime.Join(queryIdleTime, x => new
+                {
+                    x.DataHistoryRuntime.NodeID,
+                    x.DataHistoryRuntime.Date
+                }, x => new
+                {
+                    x.DataHistoryIdleTime.NodeID,
+                    x.DataHistoryIdleTime.Date
+                }, (x, dh) => new
+                {
+                    x.DataHistoryRuntime,
+                    dh.DataHistoryIdleTime,
+                })
+                    .Join(queryCycles, x => new
+                    {
+                        x.DataHistoryRuntime.NodeID,
+                        x.DataHistoryRuntime.Date,
+                    }, x => new
+                    {
+                        x.DataHistoryCycles.NodeID,
+                        x.DataHistoryCycles.Date,
+                    }, (x, dh) => new
+                    {
+                        x.DataHistoryRuntime,
+                        x.DataHistoryIdleTime,
+                        dh.DataHistoryCycles
+                    })
+                    .Where(x => x.DataHistoryRuntime.Date > numberOfRecentDays)
+                     .Join(context.NodeMasters.AsNoTracking().Where(x => x.ApplicationId == applicationRodPump && nodeIds.Contains(x.NodeId)), x => x.DataHistoryRuntime.NodeID, nm => nm.NodeId,
+                        (x, nm) => new
+                        {
+                            x.DataHistoryRuntime,
+                            x.DataHistoryIdleTime,
+                            x.DataHistoryCycles,
+                            NodeMaster = nm,
+                        })
+                    .Select(x => new
+                    {
+                        NodeId = x.DataHistoryRuntime.NodeID,
+                        Runtime = x.DataHistoryRuntime.Value,
+                        IdleTime = x.DataHistoryIdleTime.Value,
+                        Cycles = x.DataHistoryCycles.Value,
+                        x.DataHistoryRuntime.Date
+                    })
+                    .ToList();
+
+                var rodPumpResult = rodPumpResultPrimary.Distinct().Select(x => new DowntimeByWellsRodPumpModel()
+                {
+                    Id = x.NodeId,
+                    Runtime = x.Runtime,
+                    IdleTime = x.IdleTime,
+                    Cycles = x.Cycles,
+                    Date = x.Date,
+                });
+
+                var espResult = context.DataHistory.AsNoTracking().Where(x => nodeIds.Contains(x.NodeID) && x.Date > numberOfRecentDays)
+                    .Join(context.NodeMasters.AsNoTracking().Where(x => x.ApplicationId == applicationESP), dh => dh.NodeID, nm => nm.NodeId, (dh, nm) => new
+                    {
+                        DataHistory = dh,
+                        NodeMaster = nm,
+                    })
+                    .Join(context.Parameters.AsNoTracking().Where(x => x.ParamStandardType == pstFrequency), x => x.DataHistory.Address, p => p.Address, (x, p) => new
+                    {
+                        x.DataHistory,
+                    })
+                    .ToList()
+                    .Select(x => new DowntimeByWellsValueModel()
+                    {
+                        Id = x.DataHistory.NodeID,
+                        Value = x.DataHistory.Value,
+                        Date = x.DataHistory.Date,
+                    });
+
+                var glResult = context.DataHistory.AsNoTracking().Where(x => nodeIds.Contains(x.NodeID) && x.Date > numberOfRecentDays)
+                    .Join(context.NodeMasters.AsNoTracking().Where(x => x.ApplicationId == applicationGL), dh => dh.NodeID, nm => nm.NodeId, (dh, nm) => new
+                    {
+                        DataHistory = dh,
+                        NodeMaster = nm,
+                    })
+                    .Join(context.Parameters.AsNoTracking().Where(x => x.ParamStandardType == pstGasInjectionRate), x => x.DataHistory.Address, p => p.Address, (x, p) => new
+                    {
+                        x.DataHistory,
+                    })
+                    .ToList()
+                    .Select(x => new DowntimeByWellsValueModel()
+                    {
+                        Id = x.DataHistory.NodeID,
+                        Value = x.DataHistory.Value,
+                        Date = x.DataHistory.Date,
+                    });
+
+                var result = new DowntimeByWellsModel()
+                {
+                    RodPump = rodPumpResult.ToList(),
+                    ESP = espResult.ToList(),
+                    GL = glResult.ToList(),
+                };
+
+                logger.WriteCId(Level.Trace, $"Finished {nameof(DataHistorySQLStore)} {nameof(GetDowntime)}", correlationId);
+
+                return result;
+            }
+        }
+
+        #endregion
+
+    }
 }

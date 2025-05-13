@@ -20,6 +20,7 @@
       <PackageReference Include="MongoDB.Bson" Version="2.19.1" />
       <PackageReference Include="MongoDB.Driver" Version="2.19.1" />
       <PackageReference Include="Theta.XSPOC.Apex.Kernel.DateTimeConversion" Version="1.0.8" />
+      <PackageReference Include="Theta.XSPOC.Apex.Kernel.Mongo.Models" Version="1.0.2" />
   </ItemGroup>
     
   <ItemGroup>

@@ -32,12 +32,14 @@
     <PackageReference Include="Theta.XSPOC.Apex.Kernel" Version="1.0.19" />
     <PackageReference Include="Theta.XSPOC.Apex.Kernel.Data.Sql" Version="1.0.9" />
     <PackageReference Include="Theta.XSPOC.Apex.Kernel.Logging" Version="1.0.10" />
+    <PackageReference Include="Theta.XSPOC.Apex.Kernel.Mongo.Models" Version="1.0.2" />
     <PackageReference Include="Theta.XSPOC.Apex.Kernel.Utilities" Version="1.0.2" />
     <PackageReference Include="Theta.XSPOC.Apex.Kernel.UnitConversion" Version="1.0.2" />
   </ItemGroup>
   
   <ItemGroup>
     <ProjectReference Include="..\Theta.XSPOC.Apex.Api.Data.Entity\Theta.XSPOC.Apex.Api.Data.Entity.csproj" />
+    <ProjectReference Include="..\Theta.XSPOC.Apex.Api.Data.Influx\Theta.XSPOC.Apex.Api.Data.Influx.csproj" />
     <ProjectReference Include="..\Theta.XSPOC.Apex.Api.Data\Theta.XSPOC.Apex.Api.Data.csproj" />
   </ItemGroup>
 

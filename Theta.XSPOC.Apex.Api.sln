@@ -60,6 +60,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Theta.XSPOC.Apex.Api.Author
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Theta.XSPOC.Apex.Api.RealTimeData", "Theta.XSPOC.Apex.Api.RealTimeData\Theta.XSPOC.Apex.Api.RealTimeData.csproj", "{5A4D41D5-21AE-49ED-81B1-F46C809B9ABE}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Theta.XSPOC.Apex.Api.RealTimeData.Tests", "Theta.XSPOC.Apex.Api.RealTimeData.Tests\Theta.XSPOC.Apex.Api.RealTimeData.Tests.csproj", "{F91B1E3F-458B-161E-A664-6C4498508950}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -162,6 +164,10 @@ Global
 		{5A4D41D5-21AE-49ED-81B1-F46C809B9ABE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5A4D41D5-21AE-49ED-81B1-F46C809B9ABE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5A4D41D5-21AE-49ED-81B1-F46C809B9ABE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F91B1E3F-458B-161E-A664-6C4498508950}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F91B1E3F-458B-161E-A664-6C4498508950}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F91B1E3F-458B-161E-A664-6C4498508950}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F91B1E3F-458B-161E-A664-6C4498508950}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -190,6 +196,7 @@ Global
 		{93680F82-5407-4F7B-B2AE-F2DBE3B18A0E} = {027EC8DD-0B9D-43B6-9D58-A9F3F0AD25D2}
 		{9FD17D1B-CBAC-4C53-B3FC-F893AD574E8F} = {DECD331B-38D7-4085-AD67-499044FF8796}
 		{5A4D41D5-21AE-49ED-81B1-F46C809B9ABE} = {DECD331B-38D7-4085-AD67-499044FF8796}
+		{F91B1E3F-458B-161E-A664-6C4498508950} = {027EC8DD-0B9D-43B6-9D58-A9F3F0AD25D2}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {53A60A8F-1215-47B0-BC04-A22F9783E45D}

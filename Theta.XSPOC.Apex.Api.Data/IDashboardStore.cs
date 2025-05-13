@@ -38,7 +38,6 @@ namespace Theta.XSPOC.Apex.Api.Data
         /// <returns></returns>
         Task<WidgetPropertyDataModel> GetDashboardWidgetData(string dashboardName, string widgetName, string userId, string correlationId);
 
-
         /// <summary>
         /// Resets the user preferences for the dashboard widget
         /// </summary>
@@ -46,6 +45,6 @@ namespace Theta.XSPOC.Apex.Api.Data
         /// <param name="userId"></param>
         /// <param name="correlationId"></param>
         /// <returns></returns>
-        Task<bool> ResetDashboardWidgetUserPrefeernces(DashboardWidgetPreferenceDataModel input, string userId, string correlationId);
+        Task<DashboardWidgetDataModel> ResetDashboardWidgetUserPrefeernces(DashboardWidgetPreferenceDataModel input, string userId, string correlationId);
     }
 }

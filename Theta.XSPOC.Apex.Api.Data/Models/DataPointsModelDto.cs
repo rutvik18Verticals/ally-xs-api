@@ -117,5 +117,15 @@ namespace Theta.XSPOC.Apex.Api.Data.Models
         /// Gets or Sets DataPoints
         /// </summary>
         public List<DataPointModelDto> DataPoints { get; set; }
+
+        /// <summary>
+        /// Gets or Sets DataPoints
+        /// </summary>
+        public List<DataPointModelDto> MinThresholdValues { get; set; }
+
+        /// <summary>
+        /// Gets or Sets DataPoints
+        /// </summary>
+        public List<DataPointModelDto> MaxThresholdValues { get; set; }
     }
 }

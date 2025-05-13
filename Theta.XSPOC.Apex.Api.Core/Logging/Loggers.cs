@@ -71,5 +71,10 @@
         /// </summary>
         APIService,
 
+        /// <summary>
+        /// The dashboard widget service log.
+        /// </summary>
+        DashboardWidget,
+
     }
 }

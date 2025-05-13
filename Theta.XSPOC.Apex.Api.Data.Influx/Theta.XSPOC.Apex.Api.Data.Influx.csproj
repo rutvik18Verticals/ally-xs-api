@@ -27,6 +27,7 @@
   
   <ItemGroup>
     <ProjectReference Include="..\Theta.XSPOC.Apex.Api.Common\Theta.XSPOC.Apex.Api.Common.csproj" />
+    <ProjectReference Include="..\Theta.XSPOC.Apex.Api.Data.Entity\Theta.XSPOC.Apex.Api.Data.Entity.csproj" />
   </ItemGroup>
 
 </Project>

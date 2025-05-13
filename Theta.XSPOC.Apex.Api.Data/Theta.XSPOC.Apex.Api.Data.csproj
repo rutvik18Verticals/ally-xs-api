@@ -27,6 +27,7 @@
     <PackageReference Include="Theta.XSPOC.Apex.Kernel.Logging.Models" Version="1.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="7.0.2" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="7.0.2" />
+    <PackageReference Include="Theta.XSPOC.Apex.Kernel.Mongo.Models" Version="1.0.2" />
     <PackageReference Include="Theta.XSPOC.Apex.Kernel.Utilities" Version="1.0.0" />
     <PackageReference Include="Theta.XSPOC.Apex.Kernel.Quantity" Version="1.0.1" />
     <PackageReference Include="MongoDB.Bson" Version="2.19.1" />

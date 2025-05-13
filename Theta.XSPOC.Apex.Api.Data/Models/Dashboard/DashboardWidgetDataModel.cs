@@ -147,5 +147,11 @@ namespace Theta.XSPOC.Apex.Api.Data.Models.Dashboard
         /// Gets or sets WidgetProperties.
         /// </summary>
         public object WidgetProperties { get; set; }
+
+        /// <summary>
+        /// Gets or sets if the widget property is default/not.
+        /// </summary>
+        public bool IsDefault { get; set; }
+
     }
 }

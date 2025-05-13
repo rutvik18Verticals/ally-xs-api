@@ -253,6 +253,7 @@ namespace Theta.XSPOC.Apex.Api.Core.Services
             var claims = new List<Claim>
             {
                 new Claim("UserEmailId", user != null && user.Email != null ? user.Email.ToString() : ""),
+                new Claim("UserObjectId", user != null && user.UserObjectId != null ? user.UserObjectId.ToString() : ""),
                 new Claim(JwtRegisteredClaimNames.Sub, user != null ? user.UserName.ToString() : ""),
                 new Claim(JwtRegisteredClaimNames.Jti, user != null ?  user.Email ?? "" : ""),
                 new Claim(JwtRegisteredClaimNames.Iat, now.ToUniversalTime().ToString(), ClaimValueTypes.Integer64),

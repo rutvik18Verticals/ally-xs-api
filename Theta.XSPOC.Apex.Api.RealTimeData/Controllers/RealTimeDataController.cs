@@ -18,6 +18,7 @@ using Theta.XSPOC.Apex.Api.RealTimeData.Contracts.Requests;
 using Theta.XSPOC.Apex.Api.RealTimeData.Contracts.Mappers;
 using System.Text.RegularExpressions;
 using Theta.XSPOC.Apex.Api.RealTimeData.Contracts.Responses;
+using Theta.XSPOC.Apex.Api.Core.Models.Outputs;
 
 namespace Theta.XSPOC.Apex.Api.RealTimeData.Controllers
 {
@@ -56,6 +57,7 @@ namespace Theta.XSPOC.Apex.Api.RealTimeData.Controllers
         private const string downsampleWindowSizeRegExNum = "^\\d+$";
         private const string downsampleWindowSizeRegExChar = "^(s|m|h|d)$";
         private const string downsampleWindowSizeLimitAllowedRegExChar = "^(h|d)$";
+        private const string aggregateMethodRegEx = "^(first|last|mean)$";
 
         #endregion
 
@@ -506,6 +508,210 @@ namespace Theta.XSPOC.Apex.Api.RealTimeData.Controllers
             ControllerLogger.WriteCId(Level.Trace, $"Finished {nameof(RealTimeDataController)} {nameof(ValidateCustomerAsync)}", correlationId);
 
             return Ok(response);
+
+        }
+
+        /// <summary>
+        /// Handles requests for fetching time series graph data
+        /// </summary>
+        /// <param name="request">The filters contains the AssetId,StartDate,EndDate,Aggregate,AggregateMethod</param>        
+        [ProducesResponseType(typeof(TimeSeriesDataResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status500InternalServerError)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status501NotImplemented)]
+        [HttpGet("GetAssetTrendsGraphData", Name = "GetAssetTrendsGraphData")]
+        public async Task<IActionResult> GetAssetTrendsGraphData([FromQuery] GraphDataRequest request)
+        {
+            try
+            {
+                GetOrCreateCorrelationId(out var correlationId);
+
+                ControllerLogger.WriteCId(Level.Trace, $"Starting {nameof(RealTimeDataController)} {nameof(GetAssetTrendsGraphData)}", correlationId);
+
+                if (request == null)
+                {
+                    ControllerLogger.WriteCId(Level.Info, "Invalid Defaults", correlationId);
+                    ControllerLogger.WriteCId(Level.Trace, $"Finished {nameof(RealTimeDataController)} {nameof(GetAssetTrendsGraphData)}", correlationId);
+
+                    return BadRequest("Invalid Defaults");
+                }
+
+                Guid assetID = Guid.Empty;
+                if (request.AssetId.IsNullOrEmpty() || !Guid.TryParse(request.AssetId, out assetID))
+                {
+                    ControllerLogger.WriteCId(Level.Info, "Invalid Defaults", correlationId);
+                    ControllerLogger.WriteCId(Level.Trace, $"Finished {nameof(RealTimeDataController)} {nameof(GetAssetTrendsGraphData)}", correlationId);
+
+                    return BadRequest("AssetId is required.");
+                }
+
+                if (request.StartDate.IsNullOrEmpty() || !DateTime.TryParseExact(request.StartDate, "yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal, out DateTime stDate))
+                {
+                    ControllerLogger.WriteCId(Level.Info, "Invalid Defaults", correlationId);
+                    ControllerLogger.WriteCId(Level.Trace, $"Finished {nameof(RealTimeDataController)} {nameof(GetAssetTrendsGraphData)}", correlationId);
+
+                    return BadRequest("Start Date is not provided or provided format is incorrect.");
+                }
+
+                if (request.EndDate.IsNullOrEmpty() || !DateTime.TryParseExact(request.EndDate, "yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal, out DateTime endDate))
+                {
+                    ControllerLogger.WriteCId(Level.Info, "Invalid Defaults", correlationId);
+                    ControllerLogger.WriteCId(Level.Trace, $"Finished {nameof(RealTimeDataController)} {nameof(GetAssetTrendsGraphData)}", correlationId);
+
+                    return BadRequest("End Date is not provided or provided format is incorrect.");
+                }
+
+                if (stDate > endDate)
+                {
+                    ControllerLogger.WriteCId(Level.Info, "Invalid Defaults", correlationId);
+                    ControllerLogger.WriteCId(Level.Trace, $"Finished {nameof(RealTimeDataController)} {nameof(GetAssetTrendsGraphData)}", correlationId);
+
+                    return BadRequest("Start date cannot be greater than end date.");
+                }
+
+                //if (endDate > DateTime.UtcNow)
+                //{
+                //    ControllerLogger.WriteCId(Level.Info, "Invalid Defaults", correlationId);
+                //    ControllerLogger.WriteCId(Level.Trace, $"Finished {nameof(RealTimeDataController)} {nameof(GetAssetTrendsGraphData)}", correlationId);
+
+                //    return BadRequest("End date cannot be a future date.");
+                //}
+
+                if (!Regex.IsMatch(request.AggregateMethod.Trim().ToLower(), aggregateMethodRegEx))
+                {
+                    ControllerLogger.WriteCId(Level.Info, "Invalid Defaults", correlationId);
+                    ControllerLogger.WriteCId(Level.Trace, $"Finished {nameof(RealTimeDataController)} {nameof(GetAssetTrendsGraphData)}", correlationId);
+
+                    return BadRequest("AggregateMethod should be provided in valid format.");
+                }
+
+                var input = new GraphDataInput() {AssetId = assetID, StartDate= stDate, EndDate=endDate, 
+                    Aggregate = request.Aggregate, AggregateMethod= request.AggregateMethod, ReteriveMixMax = request.ReteriveMixMax };                
+
+                var requestWithCorrelationId = new WithCorrelationId<GraphDataInput>(
+                correlationId, input);
+
+                var serviceResult = await _service.GetAssetTrendsGraphData(requestWithCorrelationId);
+                if(serviceResult == null)
+                {
+                    return NotFound(StatusCodesUtility.GetStatusCodeMessage(StatusCodes.Status404NotFound));
+                }
+
+                return Ok(serviceResult);
+            }
+            catch (Exception ex)
+            {
+                ControllerLogger.Write(Level.Fatal, $"Error: {nameof(RealTimeDataController)} {nameof(GetAssetTrendsGraphData)} {ex.Message}", ex);
+                return StatusCode(StatusCodes.Status500InternalServerError, StatusCodesUtility.GetStatusCodeMessage(StatusCodes.Status500InternalServerError));
+            }
+
+        }
+
+        /// <summary>
+        /// Handles requests for fetching downtime data for graph
+        /// </summary>
+        /// <param name="request">The filters contains the AssetId,StartDate,EndDate,Aggregate,AggregateMethod</param>        
+        [ProducesResponseType(typeof(WellDowntimeDataOutput), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status500InternalServerError)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status501NotImplemented)]
+        [HttpGet("GetAssetDowntimeAndShutdownData", Name = "GetAssetDowntimeAndShutdownData")]
+        public async Task<IActionResult> GetAssetDowntimeAndShutdownData([FromQuery] GraphDataRequest request)
+        {
+            try
+            {
+                GetOrCreateCorrelationId(out var correlationId);
+
+                ControllerLogger.WriteCId(Level.Trace, $"Starting {nameof(RealTimeDataController)} {nameof(GetAssetDowntimeAndShutdownData)}", correlationId);
+
+                if (request == null)
+                {
+                    ControllerLogger.WriteCId(Level.Info, "Invalid Defaults", correlationId);
+                    ControllerLogger.WriteCId(Level.Trace, $"Finished {nameof(RealTimeDataController)} {nameof(GetAssetDowntimeAndShutdownData)}", correlationId);
+
+                    return BadRequest("Invalid Defaults");
+                }
+
+                Guid assetID = Guid.Empty;
+                if (request.AssetId.IsNullOrEmpty() || !Guid.TryParse(request.AssetId, out assetID))
+                {
+                    ControllerLogger.WriteCId(Level.Info, "Invalid Defaults", correlationId);
+                    ControllerLogger.WriteCId(Level.Trace, $"Finished {nameof(RealTimeDataController)} {nameof(GetAssetDowntimeAndShutdownData)}", correlationId);
+
+                    return BadRequest("AssetId is required.");
+                }
+
+                if (request.StartDate.IsNullOrEmpty() || !DateTime.TryParseExact(request.StartDate, "yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal, out DateTime stDate))
+                {
+                    ControllerLogger.WriteCId(Level.Info, "Invalid Defaults", correlationId);
+                    ControllerLogger.WriteCId(Level.Trace, $"Finished {nameof(RealTimeDataController)} {nameof(GetAssetDowntimeAndShutdownData)}", correlationId);
+
+                    return BadRequest("Start Date is not provided or provided format is incorrect.");
+                }
+
+                if (request.EndDate.IsNullOrEmpty() || !DateTime.TryParseExact(request.EndDate, "yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal, out DateTime endDate))
+                {
+                    ControllerLogger.WriteCId(Level.Info, "Invalid Defaults", correlationId);
+                    ControllerLogger.WriteCId(Level.Trace, $"Finished {nameof(RealTimeDataController)} {nameof(GetAssetDowntimeAndShutdownData)}", correlationId);
+
+                    return BadRequest("End Date is not provided or provided format is incorrect.");
+                }
+
+                if (stDate > endDate)
+                {
+                    ControllerLogger.WriteCId(Level.Info, "Invalid Defaults", correlationId);
+                    ControllerLogger.WriteCId(Level.Trace, $"Finished {nameof(RealTimeDataController)} {nameof(GetAssetDowntimeAndShutdownData)}", correlationId);
+
+                    return BadRequest("Start date cannot be greater than end date.");
+                }
+
+                //if (endDate > DateTime.UtcNow)
+                //{
+                //    ControllerLogger.WriteCId(Level.Info, "Invalid Defaults", correlationId);
+                //    ControllerLogger.WriteCId(Level.Trace, $"Finished {nameof(RealTimeDataController)} {nameof(GetAssetDowntimeAndShutdownData)}", correlationId);
+
+                //    return BadRequest("End date cannot be a future date.");
+                //}
+
+                //if (!Regex.IsMatch(request.AggregateMethod.Trim().ToLower(), aggregateMethodRegEx))
+                //{
+                //    ControllerLogger.WriteCId(Level.Info, "Invalid Defaults", correlationId);
+                //    ControllerLogger.WriteCId(Level.Trace, $"Finished {nameof(RealTimeDataController)} {nameof(GetAssetDowntimeAndShutdownData)}", correlationId);
+
+                //    return BadRequest("AggregateMethod should be provided in valid format.");
+                //}
+
+                var input = new GraphDataInput()
+                {
+                    AssetId = assetID,
+                    StartDate = stDate,
+                    EndDate = endDate,
+                    Aggregate = request.Aggregate,
+                    AggregateMethod = request.AggregateMethod
+                };
+
+                var requestWithCorrelationId = new WithCorrelationId<GraphDataInput>(
+                correlationId, input);
+
+                var serviceResult = await _service.GetDowntime(requestWithCorrelationId);
+                if (serviceResult == null)
+                {
+                    return NotFound(StatusCodesUtility.GetStatusCodeMessage(StatusCodes.Status404NotFound));
+                }
+
+                return Ok(serviceResult);
+            }
+            catch (Exception ex)
+            {
+                ControllerLogger.Write(Level.Fatal, $"Error: {nameof(RealTimeDataController)} {nameof(GetAssetDowntimeAndShutdownData)} {ex.Message}", ex);
+                return StatusCode(StatusCodes.Status500InternalServerError, StatusCodesUtility.GetStatusCodeMessage(StatusCodes.Status500InternalServerError));
+            }
 
         }
         #endregion

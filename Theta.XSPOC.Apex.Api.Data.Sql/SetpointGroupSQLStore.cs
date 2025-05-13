@@ -72,7 +72,7 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql
                                  join N in context.NodeMasters.AsNoTracking() on P.Poctype equals N.PocType
                                  join SP in context.SavedParameters.AsNoTracking().Where(sp => sp.NodeId == node.NodeId) on P.Address equals SP.Address into SP_join
                                  from SP in SP_join.DefaultIfEmpty()
-                                 where SG.SetpointGroupId > 0 && P.Poctype == node.PocType && N.NodeId == node.NodeId
+                                 where P.Poctype == node.PocType && N.NodeId == node.NodeId && P.Setpoint == true
                                  orderby SG.DisplayOrder
                                  select new
                                  {

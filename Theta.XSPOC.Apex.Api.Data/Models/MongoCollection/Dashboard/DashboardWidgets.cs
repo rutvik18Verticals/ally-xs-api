@@ -53,11 +53,6 @@ namespace Theta.XSPOC.Apex.Api.Data.Models.MongoCollection.Dashboard
         /// </summary>
         public string HttpBody { get; set; }
 
-        ///// <summary>
-        ///// Gets or sets WidgetProperties.
-        ///// </summary>
-        //public object WidgetProperties { get; set; }
-
         /// <summary>
         /// Gets or sets the WidgetType.
         /// </summary>

@@ -10,20 +10,43 @@ using Theta.XSPOC.Apex.Api.Data.Entity.Camera;
 using Theta.XSPOC.Apex.Api.Data.Entity.XDIAG;
 using Theta.XSPOC.Apex.Api.Data.Sql.Alarm;
 using Theta.XSPOC.Apex.Kernel.Data.Sql.Entity;
+using Microsoft.Extensions.Configuration;
+using Theta.XSPOC.Apex.Api.Data.Alarms;
+using Theta.XSPOC.Apex.Api.Data.Models;
+using Microsoft.EntityFrameworkCore;
+using System.Threading;
 
 namespace Theta.XSPOC.Apex.Api.Data.Sql.Tests.Alarm
 {
     [TestClass]
     public class AlarmRepositorySQLTests : DataStoreTestBase
     {
+        private Mock<IAlarmInfluxStore> _mockAlarmInfluxStore;
+        private Mock<IConfiguration> _mockConfiguration;
+
+        [TestInitialize]
+        public void Initialize()
+        {
+            _mockAlarmInfluxStore = new Mock<IAlarmInfluxStore>();
+            _mockConfiguration = new Mock<IConfiguration>();
+            _mockConfiguration.Setup(c => c.GetValue("EnableInflux", false)).Returns(false);
+        }
 
         #region Test Methods
 
         [TestMethod]
         [ExpectedException(typeof(ArgumentNullException))]
-        public void ConstructorNullTest()
+        public void ConstructorNullDbContextFactoryTest()
         {
-            _ = new AlarmSQLStore(null);
+            _ = new AlarmSQLStore(null, null, null);
+        }
+
+        [TestMethod]
+        public void ConstructorWithValidParametersTest()
+        {
+            var mockFactory = new Mock<IThetaDbContextFactory<NoLockXspocDbContext>>();
+            var store = new AlarmSQLStore(mockFactory.Object, _mockAlarmInfluxStore.Object, _mockConfiguration.Object);
+            Assert.IsNotNull(store);
         }
 
         [TestMethod]
@@ -33,7 +56,7 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql.Tests.Alarm
             var mockFactory = new Mock<IThetaDbContextFactory<NoLockXspocDbContext>>();
             mockFactory.Setup(m => m.GetContext()).Returns(dbContext.Object);
 
-            var repo = new AlarmSQLStore(mockFactory.Object);
+            var repo = new AlarmSQLStore(mockFactory.Object, _mockAlarmInfluxStore.Object, _mockConfiguration.Object);
 
             var result = await repo.GetAlarmConfigurationAsync(Guid.Empty, Guid.NewGuid());
 
@@ -67,7 +90,7 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql.Tests.Alarm
 
             var assetId = Guid.Parse("12E97D89-FD91-46A2-8A90-99ECB9E4E26E");
 
-            var repo = new AlarmSQLStore(mockFactory.Object);
+            var repo = new AlarmSQLStore(mockFactory.Object, _mockAlarmInfluxStore.Object, _mockConfiguration.Object);
 
             var result = await repo.GetAlarmConfigurationAsync(assetId, Guid.NewGuid());
 
@@ -101,7 +124,7 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql.Tests.Alarm
             var mockFactory = new Mock<IThetaDbContextFactory<NoLockXspocDbContext>>();
             mockFactory.Setup(m => m.GetContext()).Returns(dbContext.Object);
 
-            var repo = new AlarmSQLStore(mockFactory.Object);
+            var repo = new AlarmSQLStore(mockFactory.Object, _mockAlarmInfluxStore.Object, _mockConfiguration.Object);
 
             var result = await repo.GetHostAlarmsAsync(Guid.Empty, Guid.NewGuid());
 
@@ -123,7 +146,7 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql.Tests.Alarm
 
             var assetId = Guid.Parse("22E97D89-FD91-46A2-8190-99EEB9A4E26E");
 
-            var repo = new AlarmSQLStore(mockFactory.Object);
+            var repo = new AlarmSQLStore(mockFactory.Object, _mockAlarmInfluxStore.Object, _mockConfiguration.Object);
 
             var result = await repo.GetHostAlarmsAsync(assetId, Guid.NewGuid());
 
@@ -163,7 +186,7 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql.Tests.Alarm
 
             var assetId = Guid.Parse("12E97D89-FD91-46A2-8A90-99ECB9E4E26E");
 
-            var repo = new AlarmSQLStore(mockFactory.Object);
+            var repo = new AlarmSQLStore(mockFactory.Object, _mockAlarmInfluxStore.Object, _mockConfiguration.Object);
 
             var result = await repo.GetHostAlarmsAsync(assetId, Guid.NewGuid());
 
@@ -206,7 +229,7 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql.Tests.Alarm
             var mockFactory = new Mock<IThetaDbContextFactory<NoLockXspocDbContext>>();
             mockFactory.Setup(m => m.GetContext()).Returns(dbContext.Object);
 
-            var repo = new AlarmSQLStore(mockFactory.Object);
+            var repo = new AlarmSQLStore(mockFactory.Object, _mockAlarmInfluxStore.Object, _mockConfiguration.Object);
 
             var result = await repo.GetFacilityTagAlarmsAsync(Guid.Empty, Guid.NewGuid());
 
@@ -228,7 +251,7 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql.Tests.Alarm
 
             var assetId = Guid.Parse("22E97D89-FD91-46A2-8190-99EEB9A4E26E");
 
-            var repo = new AlarmSQLStore(mockFactory.Object);
+            var repo = new AlarmSQLStore(mockFactory.Object, _mockAlarmInfluxStore.Object, _mockConfiguration.Object);
 
             var result = await repo.GetFacilityTagAlarmsAsync(assetId, Guid.NewGuid());
 
@@ -258,7 +281,7 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql.Tests.Alarm
 
             var assetId = Guid.Parse("12E97D89-FD91-46A2-8A90-99ECB9E4E26E");
 
-            var repo = new AlarmSQLStore(mockFactory.Object);
+            var repo = new AlarmSQLStore(mockFactory.Object, _mockAlarmInfluxStore.Object, _mockConfiguration.Object);
 
             var result = await repo.GetFacilityTagAlarmsAsync(assetId, Guid.NewGuid());
 
@@ -283,7 +306,7 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql.Tests.Alarm
             var mockFactory = new Mock<IThetaDbContextFactory<NoLockXspocDbContext>>();
             mockFactory.Setup(m => m.GetContext()).Returns(dbContext.Object);
 
-            var repo = new AlarmSQLStore(mockFactory.Object);
+            var repo = new AlarmSQLStore(mockFactory.Object, _mockAlarmInfluxStore.Object, _mockConfiguration.Object);
 
             var result = await repo.GetCameraAlarmsAsync(Guid.Empty, Guid.NewGuid());
 
@@ -320,7 +343,7 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql.Tests.Alarm
 
             var assetId = Guid.Parse("22E97D89-FD91-46A2-8190-99EEB9A4E26E");
 
-            var repo = new AlarmSQLStore(mockFactory.Object);
+            var repo = new AlarmSQLStore(mockFactory.Object, _mockAlarmInfluxStore.Object, _mockConfiguration.Object);
 
             var result = await repo.GetCameraAlarmsAsync(assetId, Guid.NewGuid());
 
@@ -359,7 +382,7 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql.Tests.Alarm
 
             var assetId = Guid.Parse("12E97D89-FD91-46A2-8A90-99ECB9E4E26E");
 
-            var repo = new AlarmSQLStore(mockFactory.Object);
+            var repo = new AlarmSQLStore(mockFactory.Object, _mockAlarmInfluxStore.Object, _mockConfiguration.Object);
 
             var result = await repo.GetCameraAlarmsAsync(assetId, Guid.NewGuid());
 

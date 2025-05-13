@@ -79,6 +79,40 @@ namespace Theta.XSPOC.Apex.Api.Data.Influx.Tests.Services
                 addresses, It.IsAny<List<string>>(), request.Value.StartDate, request.Value.EndDate), Times.Once);
         }
 
+        [TestMethod]
+        public void GetDowntimeTest()
+        {
+            var mocConfig = new Mock<IConfiguration>();
+
+            Mock<IConfigurationSection> mockBucketName = new Mock<IConfigurationSection>();
+            mockBucketName.Setup(x => x.Value).Returns("XSPOC");
+
+            Mock<IConfigurationSection> mockOrg = new Mock<IConfigurationSection>();
+            mockOrg.Setup(x => x.Value).Returns("XSPOC");
+
+            mocConfig.Setup(x => x.GetSection(It.Is<string>(k => k == "AppSettings:BucketName")))
+                .Returns(mockBucketName.Object);
+            mocConfig.Setup(x => x.GetSection(It.Is<string>(k => k == "AppSettings:Org")))
+                .Returns(mockOrg.Object);
+
+            var mocInfluxClient = new Mock<IDataHistoryTrendData>();
+
+            var tables = new List<FluxTable>();
+
+            var request = new WithCorrelationId<GraphDataInput>("correlationId1", new GraphDataInput
+            {
+                AssetId = new Guid("DFC1D0AD-A824-4965-B78D-AB7755E32DD3"),
+                StartDate = DateTime.Parse("2024-01-01"),
+                EndDate = DateTime.Parse("2024-04-01")
+            });
+
+            var service = new GetDataHistoryItemsService(mocConfig.Object, mocInfluxClient.Object);
+
+            var resultNew = service.GetDowntime(request.Value.AssetId, request.Value.StartDate, request.Value.EndDate, It.IsAny<string>()).Result;
+
+            mocInfluxClient.Verify(x => x.GetDowntime(request.Value.AssetId, request.Value.StartDate, request.Value.EndDate, It.IsAny<string>()), Times.Once);
+        }
+
         #endregion
 
     }

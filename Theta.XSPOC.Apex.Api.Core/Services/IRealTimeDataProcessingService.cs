@@ -1,6 +1,8 @@
-﻿using System.Threading.Tasks;
+﻿using System.Collections.Generic;
+using System.Threading.Tasks;
 using Theta.XSPOC.Apex.Api.Core.Models.Inputs;
 using Theta.XSPOC.Apex.Api.Core.Models.Outputs;
+using Theta.XSPOC.Apex.Api.Data.Models;
 using Theta.XSPOC.Apex.Kernel.Collaboration.Models;
 
 namespace Theta.XSPOC.Apex.Api.Core.Services
@@ -49,5 +51,22 @@ namespace Theta.XSPOC.Apex.Api.Core.Services
         /// with a correlation id.</param>
         /// <returns>The <seealso cref="ValidateCustomerOutput"/>.</returns>
         Task<ValidateCustomerOutput> ValidateCustomerAsync(WithCorrelationId<ValidateCustomerInput> input);
+        
+        /// <summary>
+        /// Processes the request to get graph data
+        /// </summary>
+        /// <param name="input">The <seealso cref="WithCorrelationId{GraphDataInput}"/> to act on, annotated 
+        /// with a correlation id.</param>
+        /// <returns>The <seealso cref="DataPointsModelDto"/>.</returns>
+        Task<IList<DataPointsModelDto>> GetAssetTrendsGraphData(WithCorrelationId<GraphDataInput> input);
+
+        /// <summary>
+        /// Get the downtime and last 5 shutdowns for the asset
+        /// </summary>
+        /// <param name="input">The <seealso cref="WithCorrelationId{GraphDataInput}"/> to act on, annotated 
+        /// with a correlation id.</param>
+        /// <returns>The downtime details.</returns>
+        Task<WellDowntimeDataOutput> GetDowntime(WithCorrelationId<GraphDataInput> input);
+    
     }
 }

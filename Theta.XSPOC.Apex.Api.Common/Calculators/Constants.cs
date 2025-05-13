@@ -27,5 +27,9 @@
             public const string CARD_COLLECTION = "Card";
         }
 
+        /// <summary>
+        /// Device Id 99 is used for derived parameters.
+        /// </summary>
+        public static int DERIVED_PARAMETER_DEVICE_ID { get; set; } = 99;
     }
 }

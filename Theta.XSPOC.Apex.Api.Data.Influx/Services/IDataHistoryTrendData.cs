@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Theta.XSPOC.Apex.Api.Data.Models;
+using Theta.XSPOC.Apex.Api.Data.Models.MongoCollection;
+using Theta.XSPOC.Apex.Api.Data.Models.MongoCollection.Parameter;
 
 namespace Theta.XSPOC.Apex.Api.Data.Influx.Services
 {
@@ -38,7 +40,7 @@ namespace Theta.XSPOC.Apex.Api.Data.Influx.Services
         /// <param name="pageSize">The page size.</param> 
         /// <returns>The <seealso cref="IList{DataPointModel}"/></returns>
         Task<IList<DataPointModel>> GetAllyTimeSeriesTrendData(List<Guid> assetIds, Guid customerId,
-           List<string> channelIds, string startDate, string endDate,string downsampleType, string downsampleWindowSize
+           List<string> channelIds, string startDate, string endDate, string downsampleType, string downsampleWindowSize
             , int pageNum, int pageSize);
 
         /// <summary>
@@ -58,7 +60,7 @@ namespace Theta.XSPOC.Apex.Api.Data.Influx.Services
         Task<IList<TimeSeriesData>> GetTimeSeriesResponse(List<Guid> assetIds, Guid customerId,
            List<string> channelIds, string startDate, string endDate, string downsampleType, string downsampleWindowSize
             , int pageNum, int pageSize, List<TimeSeriesInputModel> inputs);
-        
+
         /// <summary>
         /// Method to read the trend data from influx data store with <paramref name="address"/>
         /// and <paramref name="paramStandardType"/>. 
@@ -112,5 +114,40 @@ namespace Theta.XSPOC.Apex.Api.Data.Influx.Services
         /// <returns>The <seealso cref="IList{CurrentRawScanDataInfluxModel}"/></returns>
         Task<IList<CurrentRawScanDataInfluxModel>> GetCurrentRawScanData(Guid assetId);
 
+        /// <summary>
+        /// Method to read the graph data from influx data store/>
+        /// </summary>
+        /// <param name="assetId"></param>
+        /// <param name="wellName"></param>
+        /// <param name="startDate"></param>
+        /// <param name="endDate"></param>
+        /// <param name="pocType"></param>
+        /// <param name="parameters"></param>
+        /// <param name="channelIds"></param>
+        /// <param name="listOfTrends"></param>
+        /// <param name="aggregate"></param>
+        /// <param name="aggregateMethod"></param>
+        /// <param name="nodeTimeZoneOffset"></param>
+        /// <param name="honorDaylighSaving"></param>
+        /// <returns></returns>
+        Task<IList<DataPointsModelDto>> GetInfluxDataAssetTrends(Guid assetId, string wellName, DateTime startDate, DateTime endDate, int pocType, List<Parameters> parameters, List<string> channelIds, List<DefaultParameters> listOfTrends, string aggregate, string aggregateMethod, float nodeTimeZoneOffset, bool honorDaylighSaving);
+
+        /// <summary>
+        /// Method to read the current scan data from influx data store with <paramref name="assetId"/>
+        /// </summary>
+        /// <param name="assetId">The asset guid.</param>
+        /// <param name="customerId">The customer guid.</param>
+        /// <returns>The <seealso cref="IList{DataPointModel}"/></returns>
+        Task<IList<DataPointModel>> GetCurrentRawScanData(Guid assetId, Guid customerId);
+
+        /// <summary>
+        /// Gets the downtime data from InfluxDB stores based on the assetId, start date, and end date.
+        /// </summary>
+        /// <param name="assetId">The asset id.</param>
+        /// <param name="startDate">The start date.</param>
+        /// <param name="endDate">The end date.</param>
+        /// <param name="channelId">The channel id.</param>
+        /// <returns>The influx data for downtime PST in the form of <seealso cref="IList{DataPointModel}"/>.</returns>
+        Task<IList<DataPointModel>> GetDowntime(Guid assetId, DateTime startDate, DateTime endDate, string channelId);
     }
 }

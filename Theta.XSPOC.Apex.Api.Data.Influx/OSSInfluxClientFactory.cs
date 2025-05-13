@@ -1,6 +1,9 @@
 ﻿using InfluxDB.Client;
 using Microsoft.Extensions.Configuration;
 using System;
+using Theta.XSPOC.Apex.Api.Data.Influx.Logging;
+using Theta.XSPOC.Apex.Kernel.Logging;
+using Theta.XSPOC.Apex.Kernel.Logging.Models;
 
 namespace Theta.XSPOC.Apex.Api.Data.Influx
 {
@@ -16,6 +19,8 @@ namespace Theta.XSPOC.Apex.Api.Data.Influx
         private string _password;
         private string _endPoint;
         private string _token;
+
+        private readonly IThetaLoggerFactory _loggerFactory;
 
         #endregion
 
@@ -33,13 +38,15 @@ namespace Theta.XSPOC.Apex.Api.Data.Influx
         /// <summary>
         /// Constructs a new <seealso cref="OSSInfluxClientFactory"/> using the provided <paramref name="appConfig"/>.
         /// </summary>
-        /// <param name="appConfig">The <seealso cref="IConfiguration"/>.</param>       
+        /// <param name="appConfig">The <seealso cref="IConfiguration"/>.</param>
+        /// <param name="loggerFactory">The <seealso cref="IThetaLoggerFactory"/>.</param>    
         /// <exception cref="ArgumentNullException">
         /// <paramref name="appConfig"/> is null.
         /// </exception> 
-        public OSSInfluxClientFactory(IConfiguration appConfig)
+        public OSSInfluxClientFactory(IConfiguration appConfig, IThetaLoggerFactory loggerFactory)
         {
             AppConfig = appConfig ?? throw new ArgumentNullException(nameof(appConfig));
+            _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
             SetConfigurationOnInit();
         }
 
@@ -55,6 +62,8 @@ namespace Theta.XSPOC.Apex.Api.Data.Influx
         /// </returns>
         public IInfluxDBClient Create()
         {
+            var logger = _loggerFactory.Create(LoggingModel.InfluxStore);
+
             if (!string.IsNullOrEmpty(_userName) && !string.IsNullOrEmpty(_password)
                 && !string.IsNullOrEmpty(_endPoint) && !string.IsNullOrEmpty(_token))
             {
@@ -64,11 +73,34 @@ namespace Theta.XSPOC.Apex.Api.Data.Influx
                     .Authenticate(_userName, _password.ToCharArray())
                     .TimeOut(TimeSpan.FromMinutes(2))
                     .Build();
-                return new InfluxDBClient(options);
+
+                var client = new InfluxDBClient(options);
+
+                try
+                {
+                    var _ = client.GetAuthorizationsApi().FindAuthorizationsAsync().Result;
+                }
+                catch (Exception ex)
+                {
+                    logger.Write(Level.Error, $"Authorization error in InfluxDBClient: {ex.Message}");
+                }
+
+                return client;
             }
             else
             {
-                return new InfluxDBClient(_endPoint, _userName, _password);
+                var client = new InfluxDBClient(_endPoint, _userName, _password);
+
+                try
+                {
+                    var _ = client.GetAuthorizationsApi().FindAuthorizationsAsync().Result;
+                }
+                catch (Exception ex)
+                {
+                    logger.Write(Level.Error, $"Authorization error in InfluxDBClient: {ex.Message}");
+                }
+
+                return client;
             }
         }
 

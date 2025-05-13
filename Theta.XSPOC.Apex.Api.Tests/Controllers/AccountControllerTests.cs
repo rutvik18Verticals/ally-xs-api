@@ -90,7 +90,7 @@ namespace Theta.XSPOC.Apex.Api.Tests.Controllers
             Assert.IsInstanceOfType(result, typeof(OkObjectResult));
             Assert.AreEqual(200, ((OkObjectResult)result).StatusCode);
             mockService.Verify(x => x.FindByName(It.IsAny<WithCorrelationId<FormLoginInput>>()), Times.Once);
-            Assert.AreEqual("accesstoken", ((JWTAccessToken)((OkObjectResult)result).Value).AccessToken);
+            Assert.AreEqual("accesstoken", ((JWTAccessTokenCloud)((OkObjectResult)result).Value).AccessToken);
         }
 
         [TestMethod]
@@ -215,7 +215,6 @@ namespace Theta.XSPOC.Apex.Api.Tests.Controllers
                 new Claim(ClaimTypes.Name, "testuser"),        
                 new Claim(ClaimTypes.Role, "Admin")           
             };
-
 
             var identity = new ClaimsIdentity(claims, "TestAuthType");
             return new ClaimsPrincipal(identity);

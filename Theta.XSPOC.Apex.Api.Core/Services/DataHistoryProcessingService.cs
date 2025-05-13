@@ -40,10 +40,6 @@ namespace Theta.XSPOC.Apex.Api.Core.Services
         private IDictionary<int, string> _phrases;
         private readonly IParameterMongoStore _parameterStore;
         private readonly IConfiguration _configuration;
-
-        private int itemIndex;
-        private IList<MeasurementTrendItemModel> measurementTrendData;
-        private IList<ControllerTrendItemModel> controllerTrendData;
         private readonly ICommonService _commonService;
 
         private enum LocalePhraseIDs
@@ -314,11 +310,11 @@ namespace Theta.XSPOC.Apex.Api.Core.Services
             TreeNodeType treeNodeTypeId;
             var isLegacyWell = await _portConfigurationStore.IsLegacyWellAsync((int)asset?.PortId, inputData.CorrelationId);
 
-            itemIndex = 0;
+            int itemIndex = 0;
 
-            measurementTrendData = _dataHistorySQLStore.GetMeasurementTrendItems(asset.NodeId, correlationId);
+            var measurementTrendData = _dataHistorySQLStore.GetMeasurementTrendItems(asset.NodeId, correlationId);
 
-            controllerTrendData = _dataHistorySQLStore.GetControllerTrendItems(asset.NodeId, asset.PocType, correlationId);
+            var controllerTrendData = _dataHistorySQLStore.GetControllerTrendItems(asset.NodeId, asset.PocType, correlationId);
 
             foreach (var type in selectedTypes)
             {
@@ -351,7 +347,8 @@ namespace Theta.XSPOC.Apex.Api.Core.Services
                         return response;
                     }
 
-                    dataPoints.AddRange(CreateDataHistoryItemsResponse(dataHistoryItems, request, type, inputData.CorrelationId));
+                    dataPoints.AddRange(CreateDataHistoryItemsResponse(dataHistoryItems, request, type, inputData.CorrelationId, itemIndex,
+                        measurementTrendData, controllerTrendData));
                 }
                 else
                 {
@@ -369,7 +366,8 @@ namespace Theta.XSPOC.Apex.Api.Core.Services
                     request.POCType = asset.PocType.ToString();
 
                     GetAddressAndParamStandardType(type, request.ItemId,
-                        out var address, out var paramStdType);
+                        out var address, out var paramStdType, itemIndex,
+                        measurementTrendData, controllerTrendData);
 
                     var startDate = DateTime.Parse(request.StartDate, null, DateTimeStyles.AssumeLocal).ToUniversalTime();
                     var endDate = DateTime.Parse(request.EndDate, null, DateTimeStyles.AssumeLocal).ToUniversalTime();
@@ -389,7 +387,7 @@ namespace Theta.XSPOC.Apex.Api.Core.Services
                             response.Result.Status = true;
                             response.Result.Value = string.Empty;
 
-                            dataPoints.AddRange(CreateDataHistoryItemsResponseFromInflux(dataHistoryItems, request.ItemId, address));
+                            dataPoints.AddRange(CreateDataHistoryItemsResponseFromInflux(dataHistoryItems, request.ItemId, address, itemIndex));
                         }
                         else
                         {
@@ -725,23 +723,26 @@ namespace Theta.XSPOC.Apex.Api.Core.Services
                 return response;
             }
 
-            measurementTrendData = _dataHistorySQLStore.GetMeasurementTrendItems(asset.NodeId, input.CorrelationId);
+            var measurementTrendData = _dataHistorySQLStore.GetMeasurementTrendItems(asset.NodeId, input.CorrelationId);
 
-            controllerTrendData = _dataHistorySQLStore.GetControllerTrendItems(asset.NodeId, asset.PocType, input.CorrelationId);
+            var controllerTrendData = _dataHistorySQLStore.GetControllerTrendItems(asset.NodeId, asset.PocType, input.CorrelationId);
 
             var outputResponse = new List<GraphViewTrendsData>();
             if (!request.IsOverlay)
             {
-                var chartTypes = new List<string>() { request.Chart1Type, request.Chart2Type, request.Chart3Type, request.Chart4Type };
-                var chartItemIds = new List<string>() { request.Chart1ItemId, request.Chart2ItemId, request.Chart3ItemId, request.Chart4ItemId };
+                var chartTypes = new List<string>() { request.Chart1TrendTypes, request.Chart2TrendTypes, request.Chart3TrendTypes, request.Chart4TrendTypes };
+                var chartItemIds = new List<string>() { request.Chart1TrendNames, request.Chart2TrendNames, request.Chart3TrendNames, request.Chart4TrendNames };
+                var chartAddresses = new List<string>() { request.Chart1TrendAddresses, request.Chart2TrendAddresses, request.Chart3TrendAddresses, request.Chart4TrendAddresses };
 
                 outputResponse.AddRange(await GetTrendDataByAxesAsync(
-                    input.CorrelationId, dataHistoryItems, request, isLegacyWell, chartTypes, chartItemIds));
+                    input.CorrelationId, dataHistoryItems, request, isLegacyWell, chartTypes, chartItemIds, chartAddresses,
+                    measurementTrendData, controllerTrendData));
             }
             else
             {
-                outputResponse.AddRange(await GetTrendDataByAxisAsync(dataHistoryItems, request, request.Chart1Type,
-                    request.Chart1ItemId, isLegacyWell, 0, input.CorrelationId));
+                outputResponse.AddRange(await GetTrendDataByAxisAsync(dataHistoryItems, request, request.Chart1TrendTypes,
+                    request.Chart1TrendNames, request.Chart1TrendAddresses, isLegacyWell, 0, input.CorrelationId,
+                    measurementTrendData, controllerTrendData));
             }
 
             RoundYValueToSignificantDigits(ref outputResponse, input.CorrelationId);
@@ -1637,7 +1638,8 @@ namespace Theta.XSPOC.Apex.Api.Core.Services
         }
 
         private IEnumerable<DataPoint> CreateDataHistoryItemsResponse(DataHistoryItemModel dataHistoryItems,
-            DataHistoryTrendInput request, string type, string correlationId)
+            DataHistoryTrendInput request, string type, string correlationId, int itemIndex, 
+            IList<MeasurementTrendItemModel> measurementTrendData, IList<ControllerTrendItemModel> controllerTrendData)
         {
             List<DataPoint> dataPoints = new List<DataPoint>();
 
@@ -2744,7 +2746,7 @@ namespace Theta.XSPOC.Apex.Api.Core.Services
         }
 
         private List<DataPoint> CreateDataHistoryItemsResponseFromInflux(IList<DataPointModel> dataHistoryItems,
-            string requestItemId, List<string> channelIds)
+            string requestItemId, List<string> channelIds, int itemIndex)
         {
             var responseData = new List<DataPoint>();
             if (dataHistoryItems != null && dataHistoryItems.Count > 0)
@@ -2785,7 +2787,8 @@ namespace Theta.XSPOC.Apex.Api.Core.Services
         }
 
         private void GetAddressAndParamStandardType(string typeId, string itemId,
-            out List<string> addresses, out List<string> paramStdTypes)
+            out List<string> addresses, out List<string> paramStdTypes, int itemIndex, IList<MeasurementTrendItemModel> measurementTrendData,
+            IList<ControllerTrendItemModel> controllerTrendData)
         {
             addresses = new List<string>();
             paramStdTypes = new List<string>();
@@ -2830,11 +2833,11 @@ namespace Theta.XSPOC.Apex.Api.Core.Services
         }
 
         private void GetAddressAndParamStdTypeFromParameterDocument(int pocType, string typeId, string itemId,
-          out List<string> channelIds, string correlationId, out int? address)
+          out List<string> channelIds, string correlationId, int address, int itemIndex,
+          IList<MeasurementTrendItemModel> measurementTrendData, IList<ControllerTrendItemModel> controllerTrendData)
         {
             channelIds = new List<string>();
             var treeNodeTypeId = (TreeNodeType)int.Parse(typeId);
-            address = null;
 
             if (treeNodeTypeId == TreeNodeType.CommonTrend)
             {
@@ -2842,18 +2845,12 @@ namespace Theta.XSPOC.Apex.Api.Core.Services
 
                 var item = selectedItems.Length == 1 ? selectedItems[0] : selectedItems[itemIndex];
 
-                var measurement = measurementTrendData.FirstOrDefault(x => x.Name.Equals(item.Trim(),
-                   StringComparison.OrdinalIgnoreCase) || x.Description.Equals(item.Trim(),
-                   StringComparison.OrdinalIgnoreCase));
-
-                measurement ??= measurementTrendData.FirstOrDefault(x => x.Description.Contains(item.Trim(), StringComparison.OrdinalIgnoreCase) || x.Name.Contains(item.Trim(), StringComparison.OrdinalIgnoreCase));
+                var measurement = measurementTrendData.FirstOrDefault(x => x.Address == address);
 
                 if (measurement != null)
                 {
                     if (measurement.Address != null)
                     {
-                        address = measurement.Address;
-
                         var parameterModels = _parameterStore.GetParameterData(pocType.ToString(),
                             (int)measurement.Address, correlationId);
 
@@ -2877,9 +2874,7 @@ namespace Theta.XSPOC.Apex.Api.Core.Services
 
                 if (controllerTrendData != null)
                 {
-                    var controller = controllerTrendData.FirstOrDefault(x => x.Description.Contains(item.Trim(),
-                    StringComparison.OrdinalIgnoreCase) || x.Name.Contains(item.Trim(),
-                    StringComparison.OrdinalIgnoreCase));
+                    var controller = controllerTrendData.FirstOrDefault(x => x.Address == address);
 
                     if (controller != null)
                     {
@@ -2910,6 +2905,7 @@ namespace Theta.XSPOC.Apex.Api.Core.Services
 
             var trendChannelMapping = new Dictionary<GraphViewTrendsModel, List<string>>();
 
+            int itemIndex = 0;
             foreach (var trend in defaultTrends)
             {
                 var treeNodeType = GetTreeNodeType(trend.Source);
@@ -2926,6 +2922,7 @@ namespace Theta.XSPOC.Apex.Api.Core.Services
                     var parameterModel = _parameterStore.GetParameterByParamStdType(request.POCType, trend.Address, correlationId);
                     if (parameterModel?.ChannelId != null)
                     {
+                        trend.Address = parameterModel.Address;
                         channelIds.Add(parameterModel.ChannelId);
                     }
                 }
@@ -2935,6 +2932,7 @@ namespace Theta.XSPOC.Apex.Api.Core.Services
                         trend.Address, correlationId);
                     if (parameterModels != null && parameterModels?.Count > 0)
                     {
+                        trend.Address = parameterModels.FirstOrDefault()?.Address ?? trend.Address;
                         channelIds.AddRange(parameterModels.Select(x => x.ChannelId).ToList());
                     }
                 }
@@ -2972,7 +2970,7 @@ namespace Theta.XSPOC.Apex.Api.Core.Services
                         Address = trend.Address,
                     };
 
-                    var dataPoints = CreateDataHistoryItemsResponseFromInflux(trendData, trend.ColumnName, channelIds);
+                    var dataPoints = CreateDataHistoryItemsResponseFromInflux(trendData, trend.ColumnName, channelIds, itemIndex);
                     if (dataPoints != null)
                     {
                         graphViewTrendsData.AxisValues = dataPoints.ToList();
@@ -2996,7 +2994,8 @@ namespace Theta.XSPOC.Apex.Api.Core.Services
                         Address = trend.Address,
                     };
 
-                    var dataPoints = CreateDataHistoryItemsResponse(dataHistoryItems, request, ((int)treeNodeType).ToString(), correlationId);
+                    var dataPoints = CreateDataHistoryItemsResponse(dataHistoryItems, request, 
+                        ((int)treeNodeType).ToString(), correlationId, itemIndex, measurementTrendData, controllerTrendData);
                     if (dataPoints != null)
                     {
                         graphViewTrendsData.AxisValues = dataPoints.ToList();
@@ -3079,19 +3078,21 @@ namespace Theta.XSPOC.Apex.Api.Core.Services
         }
 
         private async Task<List<GraphViewTrendsData>> GetTrendDataByAxesAsync(string correlationId, DataHistoryItemModel dataHistoryItems, TrendIDataInput request, bool isLegacyWell,
-            IList<string> chartTypes, IList<string> chartItemIds)
+            IList<string> chartTypes, IList<string> chartItemIds, IList<string> chartAddresses, IList<MeasurementTrendItemModel> measurementTrendData, IList<ControllerTrendItemModel> controllerTrendData)
         {
             List<GraphViewTrendsData> outputResponse = new List<GraphViewTrendsData>();
 
             var trendChannelMapping = new Dictionary<GraphViewTrendsData, List<string>>();
+            int itemIndex = 0;
 
             // Create channel id mappings for each chart
             int chartCount = chartTypes.Count;
-            itemIndex = 0;
             for (int chartIndex = 0; chartIndex < chartCount; chartIndex++)
             {
+                itemIndex = 0;
                 var selectedTypes = chartTypes[chartIndex].Split(',');
                 var selectedChartItemId = chartItemIds[chartIndex].Split(',');
+                var selectedAddresses = chartAddresses[chartIndex].Split(',');
                 TreeNodeType treeNodeTypeId;
 
                 foreach (var type in selectedTypes)
@@ -3113,10 +3114,11 @@ namespace Theta.XSPOC.Apex.Api.Core.Services
                     graphViewTrendsData.AxisIndex = chartIndex;
                     graphViewTrendsData.ItemId = (int)treeNodeTypeId;
 
-                    GetAddressAndParamStdTypeFromParameterDocument(int.Parse(request.POCType), type, chartItemIds[chartIndex],
-                        out var channelIds, correlationId, out var address);
-
+                    bool _ = int.TryParse(selectedAddresses[itemIndex], out var address);
                     graphViewTrendsData.Address = address;
+
+                    GetAddressAndParamStdTypeFromParameterDocument(int.Parse(request.POCType), type, chartItemIds[chartIndex],
+                        out var channelIds, correlationId, address, itemIndex, measurementTrendData, controllerTrendData);
 
                     trendChannelMapping.Add(graphViewTrendsData, channelIds);
 
@@ -3145,7 +3147,7 @@ namespace Theta.XSPOC.Apex.Api.Core.Services
 
                     ConvertDataPointDatesFromUtcToWellTime(trendData, dataHistoryItems.NodeMasterData.Tzoffset, dataHistoryItems.NodeMasterData.Tzdaylight, correlationId);
 
-                    var dataPoints = CreateDataHistoryItemsResponseFromInflux(trendData, trend.AxisLabel, channelIds);
+                    var dataPoints = CreateDataHistoryItemsResponseFromInflux(trendData, trend.AxisLabel, channelIds, itemIndex);
                     if (dataPoints != null)
                     {
                         trend.AxisValues = dataPoints.ToList();
@@ -3187,7 +3189,8 @@ namespace Theta.XSPOC.Apex.Api.Core.Services
                         inputRequest.TypeId = chartTypes[chartIndex];
                         inputRequest.GroupName = request.GroupName;
 
-                        var dataPoints = CreateDataHistoryItemsResponse(dataHistoryItems, inputRequest, ((int)treeNodeTypeId).ToString(), correlationId);
+                        var dataPoints = CreateDataHistoryItemsResponse(dataHistoryItems, inputRequest, 
+                            ((int)treeNodeTypeId).ToString(), correlationId, itemIndex, measurementTrendData, controllerTrendData);
 
                         if (dataPoints != null)
                         {
@@ -3204,13 +3207,15 @@ namespace Theta.XSPOC.Apex.Api.Core.Services
         }
 
         private async Task<List<GraphViewTrendsData>> GetTrendDataByAxisAsync(DataHistoryItemModel dataHistoryItems, TrendIDataInput request,
-            string chartType, string chartItemId, bool isLegacyWell, int chartIndex, string correlationId)
+            string chartType, string chartItemId, string chartAddresses, bool isLegacyWell, int chartIndex, string correlationId,
+            IList<MeasurementTrendItemModel> measurementTrendData, IList<ControllerTrendItemModel> controllerTrendData)
         {
             List<GraphViewTrendsData> outputResponse = new List<GraphViewTrendsData>();
             var selectedTypes = chartType.Split(',');
             var selectedChartItemId = chartItemId.Split(',');
+            var selectedChartTrendAddresses = chartAddresses.Split(',');
             TreeNodeType treeNodeTypeId;
-            itemIndex = 0;
+            int itemIndex = 0;
 
             foreach (var type in selectedTypes)
             {
@@ -3225,6 +3230,9 @@ namespace Theta.XSPOC.Apex.Api.Core.Services
                 graphViewTrendsData.AxisLabel = selectedChartItemId[itemIndex];
                 graphViewTrendsData.AxisIndex = chartIndex;
 
+                var _ = int.TryParse(selectedChartTrendAddresses[itemIndex], out var address);
+                graphViewTrendsData.Address = address;
+
                 if (isLegacyWell || treeNodeTypeId != TreeNodeType.CommonTrend)
                 {
                     var inputRequest = new DataHistoryTrendInput();
@@ -3238,21 +3246,23 @@ namespace Theta.XSPOC.Apex.Api.Core.Services
                     inputRequest.GroupName = request.GroupName;
 
                     GetAddressAndParamStdTypeFromParameterDocument(int.Parse(request.POCType), type, chartItemId,
-                        out var _, correlationId, out var address);
+                        out var _, correlationId, address, itemIndex, measurementTrendData, controllerTrendData);
 
-                    var dataPoints = CreateDataHistoryItemsResponse(dataHistoryItems, inputRequest, ((int)treeNodeTypeId).ToString(), correlationId);
+                    var dataPoints = CreateDataHistoryItemsResponse(dataHistoryItems, inputRequest, 
+                        ((int)treeNodeTypeId).ToString(), correlationId, itemIndex,
+                        measurementTrendData, controllerTrendData);
 
                     if (dataPoints != null)
                     {
                         graphViewTrendsData.AxisValues = dataPoints.ToList();
                         graphViewTrendsData.ItemId = (int)treeNodeTypeId;
-                        graphViewTrendsData.Address = address;
                     }
                 }
                 else
                 {
                     GetAddressAndParamStdTypeFromParameterDocument(int.Parse(request.POCType), type, chartItemId,
-                        out var channelIds, correlationId, out var address);
+                        out var channelIds, correlationId, address, itemIndex,
+                        measurementTrendData, controllerTrendData);
                     var startDate = ConvertWellTimeToUtc(correlationId, dataHistoryItems.NodeMasterData.Tzoffset, dataHistoryItems.NodeMasterData.Tzdaylight, request.StartDate).ToString("yyyy-MM-ddTHH:mm:ss");
                     var endDate = ConvertWellTimeToUtc(correlationId, dataHistoryItems.NodeMasterData.Tzoffset, dataHistoryItems.NodeMasterData.Tzdaylight, request.EndDate).ToString("yyyy-MM-ddTHH:mm:ss");
 
@@ -3265,12 +3275,11 @@ namespace Theta.XSPOC.Apex.Api.Core.Services
 
                         ConvertDataPointDatesFromUtcToWellTime(trendData, dataHistoryItems.NodeMasterData.Tzoffset, dataHistoryItems.NodeMasterData.Tzdaylight, correlationId);
 
-                        var dataPoints = CreateDataHistoryItemsResponseFromInflux(dataHistoryInfluxStore, chartItemId, channelIds);
+                        var dataPoints = CreateDataHistoryItemsResponseFromInflux(dataHistoryInfluxStore, chartItemId, channelIds, itemIndex);
                         if (dataPoints != null)
                         {
                             graphViewTrendsData.AxisValues = dataPoints.ToList();
                             graphViewTrendsData.ItemId = (int)treeNodeTypeId;
-                            graphViewTrendsData.Address = address;
                         }
                     }
                 }
@@ -3403,9 +3412,7 @@ namespace Theta.XSPOC.Apex.Api.Core.Services
             }
 
             var timeZone = GetTimeZoneInfo(correlationId, loggingModel);
-            var timeZoneTicks = timeZone.GetUtcOffset(DateTime.UtcNow).Ticks;
-
-            var result = utcDateTime.AddTicks(timeZoneTicks);
+            var result = TimeZoneInfo.ConvertTimeFromUtc(utcDateTime, timeZone);
 
             logger.WriteCId(Level.Debug,
                 $"Adjusting from UTC: {utcDateTime} to Time Zone {timeZone.DisplayName}: {result}", correlationId);

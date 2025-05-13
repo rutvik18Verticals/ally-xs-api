@@ -38,6 +38,8 @@ services:
       - "AppSettings:ApplicationDeploymentMode={{ApplicationDeploymentMode}}"
       - "TimeZoneBehavior:UseApplicationTimeZone={{UseApplicationTimeZone}}"
       - "TimeZoneBehavior:ApplicationTimeZone={{ApplicationTimeZone}}"
+      - "AppSettings:ESPWellDowntimePSTParamId={{ESPWellDowntimePSTParamId}}"
+      - "AppSettings:GLWellDowntimeRateParamId={{GLWellDowntimeRateParamId}}"
     ports:
       - mode: host
         published: 3022
