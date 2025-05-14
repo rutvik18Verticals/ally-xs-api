@@ -91,151 +91,15 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql.HistoricalData
         /// </returns>
         public async Task<IList<ParamStandardData>> GetParamStandardDataAsync(Guid assetId, Guid customerId)
         {
-            if (assetId == Guid.Empty)
+            bool isInfluxEnabled = _configuration.GetValue("EnableInflux", false);
+            if (isInfluxEnabled)
             {
-                return null;
+                return await GetParamStandardDataAsyncUsingMongoInflux(assetId, customerId);
             }
-#pragma warning disable IDE0029
-            await using (var context = _thetaDbContextFactory.GetContext())
+            else
             {
-                var node = await context.NodeMasters.Select(m => new
-                {
-                    m.AssetGuid,
-                    m.NodeId,
-                    m.PocType,
-                }).FirstOrDefaultAsync(m => m.AssetGuid == assetId);
-
-                if (node == null)
-                {
-                    return new List<ParamStandardData>();
-                }
-
-                var facilityTagData = context.NodeMasters.Join(context.FacilityTags, l => new
-                {
-                    Key1 = l.NodeId,
-                }, r => new
-                {
-                    Key1 = r.GroupNodeId == null ? r.NodeId : r.GroupNodeId,
-                }, (node, facilityTag) => new
-                {
-                    node,
-                    facilityTag,
-                }).Where(m => m.node.AssetGuid == assetId)
-                    .Select(m => new ParamStandardRecordData()
-                    {
-                        NodeId = m.facilityTag.NodeId,
-                        Address = m.facilityTag.Address,
-                        Value = m.facilityTag.CurrentValue,
-                        ParamStandardType = m.facilityTag.ParamStandardType,
-                        Decimals = m.facilityTag.Decimals,
-                        StringValue = null,
-                        DataType = m.facilityTag.DataType,
-                        UnitTypeId = m.facilityTag.UnitType,
-                    }).ToList();
-
-                var paramStandardData = context.Parameters.Join(context.NodeMasters, l => new
-                {
-                    Key1 = node.NodeId,
-                    Key2 = l.Poctype == 99 ? node.PocType : l.Poctype,
-                }, r => new
-                {
-                    Key1 = r.NodeId,
-                    Key2 = (int)r.PocType,
-                }, (left, right) => new
-                {
-                    left,
-                    right,
-                }).GroupJoin(context.CurrentRawScans, l => new
-                {
-                    Key1 = l.right.NodeId,
-                    Key2 = l.left.Address,
-                }, r => new
-                {
-                    Key1 = r.NodeId,
-                    Key2 = r.Address,
-                }, (left, right) => new
-                {
-                    left,
-                    right,
-                })
-                    .SelectMany(m => m.right.DefaultIfEmpty(), (left, right) => new
-                    {
-                        left,
-                        right,
-                    })
-                    .GroupJoin(context.FacilityTags, l => new
-                    {
-                        Key1 = node.NodeId,
-                        Key2 = l.left.left.left.ParamStandardType,
-                    }, r => new
-                    {
-                        Key1 = r.NodeId,
-                        Key2 = r.ParamStandardType,
-                    }, (left, right) => new
-                    {
-                        left,
-                        right,
-                    })
-                    .SelectMany(m => m.right.DefaultIfEmpty(), (left, right) => new
-                    {
-                        left,
-                        right,
-                    })
-                    .GroupJoin(context.CurrentRawScans, l => new
-                    {
-                        Key1 = node.NodeId,
-                        Key2 = l.right.Address,
-                    }, r => new
-                    {
-                        Key1 = r.NodeId,
-                        Key2 = r.Address,
-                    }, (left, right) => new
-                    {
-                        left,
-                        right,
-                    })
-                    .SelectMany(m => m.right.DefaultIfEmpty(), (left, right) => new
-                    {
-                        left,
-                        right,
-                    }).Where(m =>
-                        m.left.left.left.left.left.left.right.NodeId == node.NodeId &&
-                        m.left.left.left.left.left.left.left.ParamStandardType != null)
-                    .Select(m => new ParamStandardRecordData()
-                    {
-                        NodeId = m.left.left.left.left.left.left.right.NodeId,
-                        Address = m.left.left.right.ParamStandardType != null
-                            ? m.left.left.right.Address
-                            : m.left.left.left.left.left.left.left.Address,
-                        Value = m.left.left.right.ParamStandardType != null
-                            ? m.right.Value
-                            : m.left.left.left.left.right.Value,
-                        ParamStandardType = m.left.left.left.left.left.left.left.ParamStandardType,
-                        Decimals = m.left.left.right.ParamStandardType != null
-                            ? m.left.left.right.Decimals
-                            : m.left.left.left.left.left.left.left.Decimals,
-                        StringValue = m.left.left.right.ParamStandardType != null
-                            ? m.right.StringValue
-                            : m.left.left.left.left.right.StringValue,
-                        DataType = m.left.left.left.left.left.left.left.DataType,
-                        UnitTypeId = m.left.left.left.left.left.left.left.UnitType,
-                    }).ToList();
-
-                var result = facilityTagData.Union(paramStandardData).Select(m => new ParamStandardData()
-                {
-                    Address = m.Address,
-                    DataType = m.DataType,
-                    Decimals = m.Decimals,
-                    NodeId = m.NodeId,
-                    ParamStandardType = m.ParamStandardType,
-                    StringValue = m.StringValue,
-                    Value = m.Value == null ? null : _unitConversion.CreateUnitObject(m.UnitTypeId, m.Value.Value),
-                    UnitTypeId = m.UnitTypeId,
-                }).ToList();
-
-                return result;
+                return await GetParamStandardDataAsyncUsingSQL(assetId);
             }
-#pragma warning restore IDE0029
         }
 
         #endregion
@@ -956,5 +820,307 @@ namespace Theta.XSPOC.Apex.Api.Data.Sql.HistoricalData
             }
 #pragma warning restore IDE0029
         }
+
+        private async Task<IList<ParamStandardData>> GetParamStandardDataAsyncUsingSQL(Guid assetId)
+        {
+            if (assetId == Guid.Empty)
+            {
+                return null;
+            }
+#pragma warning disable IDE0029
+            await using (var context = _thetaDbContextFactory.GetContext())
+            {
+                var node = await context.NodeMasters.Select(m => new
+                {
+                    m.AssetGuid,
+                    m.NodeId,
+                    m.PocType,
+                }).FirstOrDefaultAsync(m => m.AssetGuid == assetId);
+
+                if (node == null)
+                {
+                    return new List<ParamStandardData>();
+                }
+
+                var facilityTagData = context.NodeMasters.Join(context.FacilityTags, l => new
+                {
+                    Key1 = l.NodeId,
+                }, r => new
+                {
+                    Key1 = r.GroupNodeId == null ? r.NodeId : r.GroupNodeId,
+                }, (node, facilityTag) => new
+                {
+                    node,
+                    facilityTag,
+                }).Where(m => m.node.AssetGuid == assetId)
+                    .Select(m => new ParamStandardRecordData()
+                    {
+                        NodeId = m.facilityTag.NodeId,
+                        Address = m.facilityTag.Address,
+                        Value = m.facilityTag.CurrentValue,
+                        ParamStandardType = m.facilityTag.ParamStandardType,
+                        Decimals = m.facilityTag.Decimals,
+                        StringValue = null,
+                        DataType = m.facilityTag.DataType,
+                        UnitTypeId = m.facilityTag.UnitType,
+                    }).ToList();
+
+                var paramStandardData = context.Parameters.Join(context.NodeMasters, l => new
+                {
+                    Key1 = node.NodeId,
+                    Key2 = l.Poctype == 99 ? node.PocType : l.Poctype,
+                }, r => new
+                {
+                    Key1 = r.NodeId,
+                    Key2 = (int)r.PocType,
+                }, (left, right) => new
+                {
+                    left,
+                    right,
+                }).GroupJoin(context.CurrentRawScans, l => new
+                {
+                    Key1 = l.right.NodeId,
+                    Key2 = l.left.Address,
+                }, r => new
+                {
+                    Key1 = r.NodeId,
+                    Key2 = r.Address,
+                }, (left, right) => new
+                {
+                    left,
+                    right,
+                })
+                    .SelectMany(m => m.right.DefaultIfEmpty(), (left, right) => new
+                    {
+                        left,
+                        right,
+                    })
+                    .GroupJoin(context.FacilityTags, l => new
+                    {
+                        Key1 = node.NodeId,
+                        Key2 = l.left.left.left.ParamStandardType,
+                    }, r => new
+                    {
+                        Key1 = r.NodeId,
+                        Key2 = r.ParamStandardType,
+                    }, (left, right) => new
+                    {
+                        left,
+                        right,
+                    })
+                    .SelectMany(m => m.right.DefaultIfEmpty(), (left, right) => new
+                    {
+                        left,
+                        right,
+                    })
+                    .GroupJoin(context.CurrentRawScans, l => new
+                    {
+                        Key1 = node.NodeId,
+                        Key2 = l.right.Address,
+                    }, r => new
+                    {
+                        Key1 = r.NodeId,
+                        Key2 = r.Address,
+                    }, (left, right) => new
+                    {
+                        left,
+                        right,
+                    })
+                    .SelectMany(m => m.right.DefaultIfEmpty(), (left, right) => new
+                    {
+                        left,
+                        right,
+                    }).Where(m =>
+                        m.left.left.left.left.left.left.right.NodeId == node.NodeId &&
+                        m.left.left.left.left.left.left.left.ParamStandardType != null)
+                    .Select(m => new ParamStandardRecordData()
+                    {
+                        NodeId = m.left.left.left.left.left.left.right.NodeId,
+                        Address = m.left.left.right.ParamStandardType != null
+                            ? m.left.left.right.Address
+                            : m.left.left.left.left.left.left.left.Address,
+                        Value = m.left.left.right.ParamStandardType != null
+                            ? m.right.Value
+                            : m.left.left.left.left.right.Value,
+                        ParamStandardType = m.left.left.left.left.left.left.left.ParamStandardType,
+                        Decimals = m.left.left.right.ParamStandardType != null
+                            ? m.left.left.right.Decimals
+                            : m.left.left.left.left.left.left.left.Decimals,
+                        StringValue = m.left.left.right.ParamStandardType != null
+                            ? m.right.StringValue
+                            : m.left.left.left.left.right.StringValue,
+                        DataType = m.left.left.left.left.left.left.left.DataType,
+                        UnitTypeId = m.left.left.left.left.left.left.left.UnitType,
+                    }).ToList();
+
+                var result = facilityTagData.Union(paramStandardData).Select(m => new ParamStandardData()
+                {
+                    Address = m.Address,
+                    DataType = m.DataType,
+                    Decimals = m.Decimals,
+                    NodeId = m.NodeId,
+                    ParamStandardType = m.ParamStandardType,
+                    StringValue = m.StringValue,
+                    Value = m.Value == null ? null : _unitConversion.CreateUnitObject(m.UnitTypeId, m.Value.Value),
+                    UnitTypeId = m.UnitTypeId,
+                }).ToList();
+
+                return result;
+            }
+#pragma warning restore IDE0029
+        }
+        private async Task<IList<ParamStandardData>> GetParamStandardDataAsyncUsingMongoInflux(Guid assetId, Guid customerId)
+        {
+            if (assetId == Guid.Empty)
+            {
+                return null;
+            }
+#pragma warning disable IDE0029
+            await using (var context = _thetaDbContextFactory.GetContext())
+            {
+                var nodeId = context.NodeMasters.Where(nm => nm.AssetGuid == assetId).Select(nm => nm.NodeId).FirstOrDefaultAsync().ToString();
+
+                var influxData = await _currentRawScansStore.GetCurrentRawScanDataFromInflux(assetId, customerId, nodeId);
+
+                var node = await context.NodeMasters.Select(m => new
+                {
+                    m.AssetGuid,
+                    m.NodeId,
+                    m.PocType,
+                }).FirstOrDefaultAsync(m => m.AssetGuid == assetId);
+
+                if (node == null)
+                {
+                    return new List<ParamStandardData>();
+                }
+
+                var facilityTagData = context.NodeMasters.Join(context.FacilityTags, l => new
+                {
+                    Key1 = l.NodeId,
+                }, r => new
+                {
+                    Key1 = r.GroupNodeId == null ? r.NodeId : r.GroupNodeId,
+                }, (node, facilityTag) => new
+                {
+                    node,
+                    facilityTag,
+                }).Where(m => m.node.AssetGuid == assetId)
+                    .Select(m => new ParamStandardRecordData()
+                    {
+                        NodeId = m.facilityTag.NodeId,
+                        Address = m.facilityTag.Address,
+                        Value = m.facilityTag.CurrentValue,
+                        ParamStandardType = m.facilityTag.ParamStandardType,
+                        Decimals = m.facilityTag.Decimals,
+                        StringValue = null,
+                        DataType = m.facilityTag.DataType,
+                        UnitTypeId = m.facilityTag.UnitType,
+                    }).ToList();
+
+                var paramStandardData = context.Parameters.Join(context.NodeMasters, l => new
+                {
+                    Key1 = node.NodeId,
+                    Key2 = l.Poctype == 99 ? node.PocType : l.Poctype,
+                }, r => new
+                {
+                    Key1 = r.NodeId,
+                    Key2 = (int)r.PocType,
+                }, (left, right) => new
+                {
+                    left,
+                    right,
+                }).GroupJoin(influxData, l => new
+                {
+                    Key1 = l.right.NodeId,
+                    Key2 = l.left.Address,
+                }, r => new
+                {
+                    Key1 = r.NodeId,
+                    Key2 = r.Address,
+                }, (left, right) => new
+                {
+                    left,
+                    right,
+                })
+                    .SelectMany(m => m.right.DefaultIfEmpty(), (left, right) => new
+                    {
+                        left,
+                        right,
+                    })
+                    .GroupJoin(context.FacilityTags, l => new
+                    {
+                        Key1 = node.NodeId,
+                        Key2 = l.left.left.left.ParamStandardType,
+                    }, r => new
+                    {
+                        Key1 = r.NodeId,
+                        Key2 = r.ParamStandardType,
+                    }, (left, right) => new
+                    {
+                        left,
+                        right,
+                    })
+                    .SelectMany(m => m.right.DefaultIfEmpty(), (left, right) => new
+                    {
+                        left,
+                        right,
+                    })
+                    .GroupJoin(influxData, l => new
+                    {
+                        Key1 = node.NodeId,
+                        Key2 = l.right.Address,
+                    }, r => new
+                    {
+                        Key1 = r.NodeId,
+                        Key2 = r.Address,
+                    }, (left, right) => new
+                    {
+                        left,
+                        right,
+                    })
+                    .SelectMany(m => m.right.DefaultIfEmpty(), (left, right) => new
+                    {
+                        left,
+                        right,
+                    }).Where(m =>
+                        m.left.left.left.left.left.left.right.NodeId == node.NodeId &&
+                        m.left.left.left.left.left.left.left.ParamStandardType != null)
+                    .Select(m => new ParamStandardRecordData()
+                    {
+                        NodeId = m.left.left.left.left.left.left.right.NodeId,
+                        Address = m.left.left.right.ParamStandardType != null
+                            ? m.left.left.right.Address
+                            : m.left.left.left.left.left.left.left.Address,
+                        Value = m.left.left.right.ParamStandardType != null
+                            ? m.right.Value
+                            : m.left.left.left.left.right.Value,
+                        ParamStandardType = m.left.left.left.left.left.left.left.ParamStandardType,
+                        Decimals = m.left.left.right.ParamStandardType != null
+                            ? m.left.left.right.Decimals
+                            : m.left.left.left.left.left.left.left.Decimals,
+                        StringValue = m.left.left.right.ParamStandardType != null
+                            ? m.right.StringValue
+                            : m.left.left.left.left.right.StringValue,
+                        DataType = m.left.left.left.left.left.left.left.DataType,
+                        UnitTypeId = m.left.left.left.left.left.left.left.UnitType,
+                    }).ToList();
+
+                var result = facilityTagData.Union(paramStandardData).Select(m => new ParamStandardData()
+                {
+                    Address = m.Address,
+                    DataType = m.DataType,
+                    Decimals = m.Decimals,
+                    NodeId = m.NodeId,
+                    ParamStandardType = m.ParamStandardType,
+                    StringValue = m.StringValue,
+                    Value = m.Value == null ? null : _unitConversion.CreateUnitObject(m.UnitTypeId, m.Value.Value),
+                    UnitTypeId = m.UnitTypeId,
+                }).ToList();
+
+                return result;
+            }
+#pragma warning restore IDE0029
+        }
+
     }
 }
